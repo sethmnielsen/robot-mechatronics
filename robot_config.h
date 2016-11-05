@@ -1,26 +1,26 @@
-/* 
+/*
  * File:   Robot Registry Configuration
  * Author: Aaron Bame, Carson Zaugg, Seth Nielsen, Derek Sanchez
- * Comments: 
+ * Comments:
  * Revision history: 10/22-Started
  * 11/4-state variables created, A/D configuration, OC config, FORWARD state - AB/SN
- * 
+ *
  * To-do list: Configure Timer 2
  * AIM state
  * DETECT state
  * Servo config
  */
 
- 
+
 #ifndef XC_HEADER_TEMPLATE_H
 #define	XC_HEADER_TEMPLATE_H
-#include <xc.h>   
+#include <xc.h>
 #pragma config FNOSC=LPRC        //31kHz Oscillator
 
 // Global Variables
 enum state {OFF, START, ROTATE, REVERSE, COLLECT, FORWARD, DETECT, AIM, SHOOT};
-int T2CNT=0;
-int steps=0;
+int T2CNT = 0;
+int steps = 0;
 int rev = 400; // number of steps for 1 revolution of wheels
 int turn180 = 326/0.9;
 
@@ -28,8 +28,8 @@ void ad_config (void);
 void OC_config(void);         //Configure PWM for driving motors
 
 //Configure Change Notifications
-void config_timer1 (void);       
-void config_timer2 (void);       
+void config_timer1 (void);
+void config_timer2 (void);
 void switch_config (void);      //Switch Change Notification
 void s1notify_config (void);    //Ball Sensor Change Notification
 void s2rnotify_config (void);   //R Button Change Notification
@@ -51,7 +51,7 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void);       //Interr
 
 
 //Function Declarations
-void ad_config ()   
+void ad_config ()
 {
     _ADON = 0;    // AD1CON1<15> -- Turn off A/D during config
 
@@ -67,7 +67,7 @@ void ad_config ()
     _NVCFG = 0;   // AD1CON2<13> -- Use VSS as negative ref voltage
     _BUFREGEN = 1;// AD1CON2<11> -- Result appears in buffer location corresponding to channel
     _CSCNA = 1;   // AD1CON2<10> -- Does not scan inputs(0) Scans inputs (1)
-                  // specified in AD1CSSx registers (instead uses channels specified by CH0SA bits in AD1CHS register) 
+                  // specified in AD1CSSx registers (instead uses channels specified by CH0SA bits in AD1CHS register)
                   //-- Selecting '0' here probably makes writing to the AD1CSSL register unnecessary.
     _SMPI = 2;    // AD1CON2<6:2> -- Each conversion sent to buffer (# of scanning pins - 1)
     _ALTS = 0;    // AD1CON2<0> -- Sample MUXA only
@@ -81,7 +81,7 @@ void ad_config ()
     _CSS4 = 1;      //Pin 6 (Photodiode)
     _CSS13 = 1;     //Pin 7 (Photodiode)
     _CSS14 = 1;     //Pin 8 (Photodiode)
-    
+
     _ADON = 1;    // AD1CON1<15> -- Turn on A/D
 }
 
@@ -92,16 +92,16 @@ void OC_cofig(void)
     OC1CON2bits.SYNCSEL = 0x1F;     //Compares to output compare module
     OC1CON2bits.OCTRIG = 0;         //Synchronizes to specified SYNCSEL value
     OC1CON1bits.OCM = 0b110;        //Edge aligned
-    
+
     OC1RS = 300;                    //Period
     OC1R = 0;                       //Duty Cycle (0 = hold stationary)
-    
+
     //Ball Collection servo PWM configuration (Pin 5)
     OC3CON1bits.OCTSEL = 0b111;     //Compare to system clock
     OC3CON2bits.SYNCSEL = 0x1F;     //Compares to output compare module
     OC3CON2bits.OCTRIG = 0;         //Synchronizes to specified SYNCSEL value
     OC3CON1bits.OCM = 0b110;        //Edge aligned
-    
+
     OC3RS = 300;                    //Period
     OC3R = 0.5*OC2RS;               //Duty Cycle
 }
@@ -109,61 +109,61 @@ void OC_cofig(void)
 
 void config_timer1 (void)
 {
-    T1CONbits.TON=0;
-    T1CONbits.TCS=0;
-    T1CONbits.TCKPS=0b11;   // prescale 1:256
-    
+    T1CONbits.TON = 0;
+    T1CONbits.TCS = 0;
+    T1CONbits.TCKPS = 0b11;   // prescale 1:256
+
     PR1 = 7266;             //Set Period for 120 s
-    TMR1=0;                 //Start at t=0
-    _T1IP=1;                //Highest Priority?
-    _T1IE=1;                //Enable the timer
-    _T1IF=0;                //Clear the flag
+    TMR1 = 0;                 //Start at t=0
+    _T1IP = 1;                //Highest Priority?
+    _T1IE = 1;                //Enable the timer
+    _T1IF = 0;                //Clear the flag
 }
 
 void config_timer2 (void)
 {
-    T2CONbits.TON=0;
-    T2CONbits.TCS=0;
-    T2CONbits.TCKPS=0b11;   // prescale 1:256
-    
+    T2CONbits.TON = 0;
+    T2CONbits.TCS = 0;
+    T2CONbits.TCKPS = 0b11;   // prescale 1:256
+
     PR2 = 7266;             //Set Period for 120 s
-    TMR2=0;                 //Start at t=0
-    _T2IP=1;                //Highest Priority?
-    _T2IE=1;                //Enable the timer
-    _T2IF=0;                //Clear the flag
+    TMR2 = 0;                 //Start at t=0
+    _T2IP = 1;                //Highest Priority?
+    _T2IE = 1;                //Enable the timer
+    _T2IF = 0;                //Clear the flag
 }
 
 void switch_config (void)
 {
-    _CN5IE=1;   //Does this enable change notification on pin 5 (CN5)???????????
-    _CN5PUE=0;  //?????
-    _CNIP=6;    //Priority
-    _CNIF=0;    //Clear Notification Flag
-    _CNIE=1;    //Enable interrupt
+    _CN5IE = 1;   //Does this enable change notification on pin 5 (CN5)???????????
+    _CN5PUE = 0;  //?????
+    _CNIP = 6;    //Priority
+    _CNIF = 0;    //Clear Notification Flag
+    _CNIE = 1;    //Enable interrupt
 }
 void s1notify_config (void)
 {
-    
+
 }
 void s2rnotify_config (void)
 {
-    
+
 }
 void s2lnotify_config (void)
 {
-    
+
 }
 void s4rnotify_config (void)
 {
-    
+
 }
 void s4fnotify_config (void)		//if state==start, go to dispenser; else state=aim
 {
-    
+
 }
 void s4lnotify_config (void)
 {
-    
+
 }
 
 
@@ -175,38 +175,38 @@ void __attribute__((interrupt, no_auto_psv)) timer (void)
 }
 void __attribute__((interrupt, no_auto_psv)) switch_change (void)
 {
-    
+
 }
 void __attribute__((interrupt, no_auto_psv)) s1notify (void)
 {
-    
+
 }
 void __attribute__((interrupt, no_auto_psv)) s2rnotify (void)
 {
-    
+
 }
 void __attribute__((interrupt, no_auto_psv)) s2lnotify (void)
 {
-    
+
 }
 void __attribute__((interrupt, no_auto_psv)) s4rnotify (void)
 {
-    
+
 }
 void __attribute__((interrupt, no_auto_psv)) s4fnotify (void)
 {
-    
+
 }
 void __attribute__((interrupt, no_auto_psv)) s4lnotify (void)
 {
-    
+
 }
 void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void)
 {
-    _OC1IF=0;       //Clear interrupt flag
-    
+    _OC1IF = 0;       //Clear interrupt flag
+
     steps += 1;
-    
+
     switch (state) {
         case START:
             //Keep rotating until finds beam
@@ -217,17 +217,17 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void)
         case REVERSE:
             break;
         case FORWARD:
-            if (steps < 1.872*rev) 
+            if (steps < 1.872*rev)
             {
                 _LATB13 = 1;
                 _LATB12 = 1;
             }
-             else 
+             else
             {
                 state = DETECT;
                 steps = 0;
             }
-            
+
             break;
         default:
             steps = 0;
