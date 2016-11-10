@@ -1,6 +1,6 @@
 /*
  * File:   Robot Registry Configuration
- * Author: Aaron Bame, Carson Zaugg, Seth Nielsen, Derek Sanchez
+ * Authors: Aaron Bame, Carson Zaugg, Seth Nielsen, Derek Sanchez
  * Comments:
  * Revision history: 10/22-Started
  * 11/4-state variables created, A/D configuration, OC config, FORWARD state - AB/SN
@@ -14,22 +14,22 @@
 #ifndef XC_HEADER_TEMPLATE_H
 #define	XC_HEADER_TEMPLATE_H
 #include <xc.h>
-#pragma config FNOSC=LPRC        //31kHz Oscillator
+#pragma config FNOSC=LPRC //31kHz Oscillator
 
 // Global Variables
 enum state {OFF, START, ROTATE, REVERSE, COLLECT, FORWARD, AIM, SHOOT};
-int T2CNT = 0;
+int T2CNT = 0;              // save count of TMR2 for returning to SHOOT
 int steps = 0;
-int rev = 400; // number of steps for 1 revolution of wheels
-int turn180 = 326/0.9;
+int rev = 400;              // steps for 1 revolution of wheels
+int turn180 = 326/0.9;      // steps for turning robot 180 deg
 
-void ad_config (void);
-void OC_config(void);         //Configure PWM for driving motors
+void ad_config (void);      //LED sensors
+void OC_config(void);       //Configure PWM for driving motors
 
 //Configure Change Notifications
-void T1_config (void);           //Competition round
-void T2_config (void);           //Counting 6 balls
-void buttons_config (void);    //Counting 6 balls
+void T1_config (void);              //Competition round
+void T2_config (void);              //Counting 6 balls
+void buttons_config (void);         //Counting 6 balls
 
 //Interrupt Actions
 void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void);        //Timer1 interrupt
@@ -42,9 +42,9 @@ void __attribute__((interrupt, no_auto_psv)) LLED (void);                //L LED
 void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void);        //Interrupt for stepper period counter
 
 
-//Function Declarations
-void ad_config ()
-{
+
+/********************************************** FUNCTION DECLARATIONS ************************************************/
+void ad_config () {
     _ADON = 0;    // AD1CON1<15> -- Turn off A/D during config
 
     // AD1CON1 register
@@ -77,8 +77,7 @@ void ad_config ()
     _ADON = 1;    // AD1CON1<15> -- Turn on A/D
 }
 
-void OC_cofig(void)
-{
+void OC_cofig(void) {
     //Stepper PWM configuration(Pin 14)
     OC1CON1bits.OCTSEL = 0b111;     //Compare to system clock
     OC1CON2bits.SYNCSEL = 0x1F;     //Compares to output compare module
@@ -98,22 +97,19 @@ void OC_cofig(void)
     OC3R = 0.5*OC2RS;               //Duty Cycle
 }
 
-
-void config_timer1 (void)
-{
+void T1_config (void) {
     T1CONbits.TON = 0;
     T1CONbits.TCS = 0;
     T1CONbits.TCKPS = 0b11;   // prescale 1:256
 
-    PR1 = 7266;             //Set Period for 120 s
+    PR1 = 7266;               //Set Period for 120 s
     TMR1 = 0;                 //Start at t=0
     _T1IP = 1;                //Highest Priority?
     _T1IE = 1;                //Enable the timer
     _T1IF = 0;                //Clear the flag
 }
 
-void config_timer2 (void)
-{
+void T2_config (void) {
     T2CONbits.TON = 0;
     T2CONbits.TCS = 0;
     T2CONbits.TCKPS = 0b11;   // prescale 1:256
@@ -125,54 +121,43 @@ void config_timer2 (void)
     _T2IF = 0;                //Clear the flag
 }
 
-void switch_config (void)
-{
+void switch_config (void) {
     _CN5IE = 1;   //Does this enable change notification on pin 5 (CN5)???????????
     _CN5PUE = 0;  //?????
     _CNIP = 6;    //Priority
     _CNIF = 0;    //Clear Notification Flag
     _CNIE = 1;    //Enable interrupt
 }
-void buttons_config (void)
-{
-    
+
+void buttons_config (void) {
+    // asdf
 }
 
 
-void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void)
-{
+void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void) {
     _T1IF = 0;        //Reset timer
     _TRISA = 0;
     _TRISB = 0;
 }
-void __attribute__((interrupt, no_auto_psv)) _T2Interrupt (void)
-{
+void __attribute__((interrupt, no_auto_psv)) _T2Interrupt (void) {
     _T2IF = 0;        // Reset timer
-    T2CNT = TMR2;     // Save value of timer2 
+    T2CNT = TMR2;     // Save value of timer2
     _LATB15 = 0;      // Pin 18 low, turn shooter motors off
 }
-void __attribute__((interrupt, no_auto_psv)) switch_change (void)
-{
-    
+void __attribute__((interrupt, no_auto_psv)) switch_change (void) {
+    // asdf
 }
-void __attribute__((interrupt, no_auto_psv)) s2rnotify (void)
-{
-    
+void __attribute__((interrupt, no_auto_psv)) buttons (void) {
+void __attribute__((interrupt, no_auto_psv)) RLED (void) {
+    // set duty for 180 deg position
 }
-void __attribute__((interrupt, no_auto_psv)) s4rnotify (void)
-{
-    
+void __attribute__((interrupt, no_auto_psv)) FLED (void) {
+    // set duty for 90 deg position
 }
-void __attribute__((interrupt, no_auto_psv)) s4fnotify (void)
-{
-    
+void __attribute__((interrupt, no_auto_psv)) LLED (void) {
+    // set duty for 0 deg position
 }
-void __attribute__((interrupt, no_auto_psv)) s4lnotify (void)
-{
-    
-}
-void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void)
-{
+void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
     _OC1IF = 0;       //Clear interrupt flag
 
     steps += 1;

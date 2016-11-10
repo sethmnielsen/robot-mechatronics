@@ -1,6 +1,6 @@
 /*
  * File:   robot_main.c
- * Author: abame
+ * Authors: Aaron Bame, Carson Zaugg, Seth Nielsen, Derek Sanchez
  *
  * Created on November 4, 2016, 3:10 PM
  */
@@ -8,11 +8,12 @@
 #include "robot_config.h"
 
 int main(void) {
-    
+
     ad_config();
     OC_config();
-    
+
     //INCLUDE CONFIGURATION FUNCTIONS HERE!!!!!!!!!!
+    //configure all pins as inputs/outputs, digital
     state=FORWARD;
     while (1)
     {
@@ -43,7 +44,7 @@ int main(void) {
                 break;
         }
     }
-    
-    
+
+
     return 0;
 }
