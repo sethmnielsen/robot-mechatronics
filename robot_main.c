@@ -31,12 +31,12 @@ int main(void) {
             case FORWARD:
                 OC1R = 0.5*OC1RS;
                 break;
-            case DETECT:
+            case AIM:
                 OC1R = 0;
                 break;
-            case AIM:
-                break;
             case SHOOT:
+                _LATB15 = 1;
+                config_timer2();
                 break;
             default:
                 //????????????????

@@ -5,9 +5,8 @@
  * Revision history: 10/22-Started
  * 11/4-state variables created, A/D configuration, OC config, FORWARD state - AB/SN
  *
- * To-do list: Configure Timer 2
+ * To-do list:
  * AIM state
- * DETECT state
  * Servo config
  */
 
@@ -18,7 +17,7 @@
 #pragma config FNOSC=LPRC        //31kHz Oscillator
 
 // Global Variables
-enum state {OFF, START, ROTATE, REVERSE, COLLECT, FORWARD, DETECT, AIM, SHOOT};
+enum state {OFF, START, ROTATE, REVERSE, COLLECT, FORWARD, AIM, SHOOT};
 int T2CNT = 0;
 int steps = 0;
 int rev = 400; // number of steps for 1 revolution of wheels
@@ -28,26 +27,19 @@ void ad_config (void);
 void OC_config(void);         //Configure PWM for driving motors
 
 //Configure Change Notifications
-void config_timer1 (void);
-void config_timer2 (void);
-void switch_config (void);      //Switch Change Notification
-void s1notify_config (void);    //Ball Sensor Change Notification
-void s2rnotify_config (void);   //R Button Change Notification
-void s2lnotify_config (void);   //L Button Change Notification
-void s4rnotify_config (void);   //R LED Change Notification
-void s4fnotify_config (void);   //Forward LED Change Notification
-void s4lnotify_config (void);   //L LED Change Notification
+void T1_config (void);           //Competition round
+void T2_config (void);           //Counting 6 balls
+void buttons_config (void);    //Counting 6 balls
 
 //Interrupt Actions
-void __attribute__((interrupt, no_auto_psv)) timer (void);              //Timer interrupt
-void __attribute__((interrupt, no_auto_psv)) switch_change (void);      //Sensor Change Notification
-void __attribute__((interrupt, no_auto_psv)) s1notify (void);           //Ball Sensor Change Notification
-void __attribute__((interrupt, no_auto_psv)) s2rnotify (void);          //R Button Change Notification
-void __attribute__((interrupt, no_auto_psv)) s2lnotify (void);          //L Button Change Notification
-void __attribute__((interrupt, no_auto_psv)) s4rnotify (void);          //R LED Change Notification
-void __attribute__((interrupt, no_auto_psv)) s4fnotify (void);          //Forward LED Change Notification
-void __attribute__((interrupt, no_auto_psv)) s4lnotify (void);          //L LED Change Notification
-void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void);       //Interrupt for stepper period counter
+void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void);        //Timer1 interrupt
+void __attribute__((interrupt, no_auto_psv)) _T2Interrupt(void);         //Timer2 interrupt
+void __attribute__((interrupt, no_auto_psv)) switch_change (void);       //Sensor Change Notification
+void __attribute__((interrupt, no_auto_psv)) buttons (void);             //R Button Change Notification
+void __attribute__((interrupt, no_auto_psv)) RLED (void);                //R LED Change Notification
+void __attribute__((interrupt, no_auto_psv)) FLED (void);                //Forward LED Change Notification
+void __attribute__((interrupt, no_auto_psv)) LLED (void);                //L LED Change Notification
+void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void);        //Interrupt for stepper period counter
 
 
 //Function Declarations
@@ -126,8 +118,8 @@ void config_timer2 (void)
     T2CONbits.TCS = 0;
     T2CONbits.TCKPS = 0b11;   // prescale 1:256
 
-    PR2 = 7266;             //Set Period for 120 s
-    TMR2 = 0;                 //Start at t=0
+    PR2 = 5;                  //Set period for shooting 6 balls
+    TMR2 = T2CNT;             //Start at t=0
     _T2IP = 1;                //Highest Priority?
     _T2IE = 1;                //Enable the timer
     _T2IF = 0;                //Clear the flag
@@ -141,65 +133,43 @@ void switch_config (void)
     _CNIF = 0;    //Clear Notification Flag
     _CNIE = 1;    //Enable interrupt
 }
-void s1notify_config (void)
+void buttons_config (void)
 {
-
-}
-void s2rnotify_config (void)
-{
-
-}
-void s2lnotify_config (void)
-{
-
-}
-void s4rnotify_config (void)
-{
-
-}
-void s4fnotify_config (void)		//if state==start, go to dispenser; else state=aim
-{
-
-}
-void s4lnotify_config (void)
-{
-
+    
 }
 
 
-void __attribute__((interrupt, no_auto_psv)) timer (void)
+void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void)
 {
     _T1IF = 0;        //Reset timer
     _TRISA = 0;
     _TRISB = 0;
 }
+void __attribute__((interrupt, no_auto_psv)) _T2Interrupt (void)
+{
+    _T2IF = 0;        // Reset timer
+    T2CNT = TMR2;     // Save value of timer2 
+    _LATB15 = 0;      // Pin 18 low, turn shooter motors off
+}
 void __attribute__((interrupt, no_auto_psv)) switch_change (void)
 {
-
-}
-void __attribute__((interrupt, no_auto_psv)) s1notify (void)
-{
-
+    
 }
 void __attribute__((interrupt, no_auto_psv)) s2rnotify (void)
 {
-
-}
-void __attribute__((interrupt, no_auto_psv)) s2lnotify (void)
-{
-
+    
 }
 void __attribute__((interrupt, no_auto_psv)) s4rnotify (void)
 {
-
+    
 }
 void __attribute__((interrupt, no_auto_psv)) s4fnotify (void)
 {
-
+    
 }
 void __attribute__((interrupt, no_auto_psv)) s4lnotify (void)
 {
-
+    
 }
 void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void)
 {
@@ -224,7 +194,7 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void)
             }
              else
             {
-                state = DETECT;
+                state = AIM;
                 steps = 0;
             }
 
