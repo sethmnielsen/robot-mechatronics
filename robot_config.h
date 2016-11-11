@@ -18,28 +18,26 @@
 
 // Global Variables
 enum state {OFF, START, ROTATE, REVERSE, COLLECT, FORWARD, AIM, SHOOT};
+
 int T2CNT = 0;              // save count of TMR2 for returning to SHOOT
 int steps = 0;
 int rev = 400;              // steps for 1 revolution of wheels
 int turn180 = 326/0.9;      // steps for turning robot 180 deg
 
+//Configs
 void ad_config (void);      //LED sensors
 void OC_config(void);       //Configure PWM for driving motors
-
-//Configure Change Notifications
-void T1_config (void);              //Competition round
-void T2_config (void);              //Counting 6 balls
-void buttons_config (void);         //Counting 6 balls
+void T1_config (void);      //Competition round
+void T2_config (void);      //Counting 6 balls
+void CN_config (void);
 
 //Interrupt Actions
-void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void);        //Timer1 interrupt
-void __attribute__((interrupt, no_auto_psv)) _T2Interrupt(void);         //Timer2 interrupt
-void __attribute__((interrupt, no_auto_psv)) switch_change (void);       //Sensor Change Notification
-void __attribute__((interrupt, no_auto_psv)) buttons (void);             //R Button Change Notification
-void __attribute__((interrupt, no_auto_psv)) RLED (void);                //R LED Change Notification
-void __attribute__((interrupt, no_auto_psv)) FLED (void);                //Forward LED Change Notification
-void __attribute__((interrupt, no_auto_psv)) LLED (void);                //L LED Change Notification
-void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void);        //Interrupt for stepper period counter
+void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void);       //Timer1 interrupt
+void __attribute__((interrupt, no_auto_psv)) _T2Interrupt(void);        //Timer2 interrupt
+void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void);       //Change notification for LEDs, buttons
+void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void);       //Interrupt for stepper period counter
+void __attribute__((interrupt, no_auto_psv)) _OC2Interrupt(void);       //Interrupt for turret servo angle
+void __attribute__((interrupt, no_auto_psv)) _OC3Interrupt(void);       //Interrupt for ball collector servo
 
 
 
@@ -122,11 +120,11 @@ void T2_config (void) {
 }
 
 void switch_config (void) {
-    _CN5IE = 1;   //Does this enable change notification on pin 5 (CN5)???????????
-    _CN5PUE = 0;  //?????
-    _CNIP = 6;    //Priority
-    _CNIF = 0;    //Clear Notification Flag
-    _CNIE = 1;    //Enable interrupt
+    _CN5IE = 1;  // Enable CN on pin 5 (CNEN1 register)
+    _CN5PUE = 0; // Disable pull-up resistor (CNPU1 register)
+    _CNIP = 6;   // Set CN interrupt priority (IPC4 register)
+    _CNIF = 0;   // Clear interrupt flag (IFS1 register)
+    _CNIE = 1;   // Enable CN interrupts (IEC1 register)
 }
 
 void buttons_config (void) {
@@ -144,12 +142,17 @@ void __attribute__((interrupt, no_auto_psv)) _T2Interrupt (void) {
     T2CNT = TMR2;     // Save value of timer2
     _LATB15 = 0;      // Pin 18 low, turn shooter motors off
 }
-void __attribute__((interrupt, no_auto_psv)) switch_change (void) {
-    // asdf
-}
-void __attribute__((interrupt, no_auto_psv)) buttons (void) {
-void __attribute__((interrupt, no_auto_psv)) RLED (void) {
-    // set duty for 180 deg position
+void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void) {
+    _CNIF = 0;
+    if (RLED == 1 && (state == AIM || state == SHOOT)) {
+        // set duty for 180 deg position
+    }
+    if (FLED == 1 && (state == ROTATE || state == AIM || state == SHOOT)) {
+        // set duty for 90 deg position
+    }
+    if (LLED == 1 && (state == AIM || state == SHOOT)) {
+        // set duty for 0 deg position
+    }
 }
 void __attribute__((interrupt, no_auto_psv)) FLED (void) {
     // set duty for 90 deg position
@@ -167,25 +170,29 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
             //Keep rotating until finds beam
             break;
         case ROTATE:
-            //Drive until Button Interrupt
+            //rotate 180 deg
             break;
         case REVERSE:
+            //Drive until Button Interrupt
             break;
         case FORWARD:
-            if (steps < 1.872*rev)
-            {
+            if (steps < 1.872*rev) {
                 _LATB13 = 1;
                 _LATB12 = 1;
             }
-             else
-            {
+            else {
                 state = AIM;
                 steps = 0;
             }
-
             break;
         default:
             steps = 0;
             break;
     }
+}
+void __attribute__((interrupt, no_auto_psv)) _OC2Interrupt(void) {
+
+}
+void __attribute__((interrupt, no_auto_psv)) _OC3Interrupt(void) {
+
 }

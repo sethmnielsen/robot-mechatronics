@@ -14,7 +14,7 @@ int main(void) {
 
     //INCLUDE CONFIGURATION FUNCTIONS HERE!!!!!!!!!!
     //configure all pins as inputs/outputs, digital
-    state=FORWARD;
+    state = FORWARD;
     while (1)
     {
         switch (state)
@@ -26,14 +26,17 @@ int main(void) {
             case ROTATE:
                 break;
             case REVERSE:
+                OC1R = 0.5*OC1RS;
                 break;
             case COLLECT:
+                OC1R = 0;
                 break;
             case FORWARD:
                 OC1R = 0.5*OC1RS;
                 break;
             case AIM:
                 OC1R = 0;
+
                 break;
             case SHOOT:
                 _LATB15 = 1;
