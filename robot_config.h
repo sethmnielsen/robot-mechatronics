@@ -36,7 +36,6 @@ void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void);       //Timer1
 void __attribute__((interrupt, no_auto_psv)) _T2Interrupt(void);        //Timer2 interrupt
 void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void);       //Change notification for LEDs, buttons
 void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void);       //Interrupt for stepper period counter
-void __attribute__((interrupt, no_auto_psv)) _OC2Interrupt(void);       //Interrupt for turret servo angle
 void __attribute__((interrupt, no_auto_psv)) _OC3Interrupt(void);       //Interrupt for ball collector servo
 
 
@@ -119,18 +118,17 @@ void T2_config (void) {
     _T2IF = 0;                //Clear the flag
 }
 
-void switch_config (void) {
-    _CN5IE = 1;  // Enable CN on pin 5 (CNEN1 register)
-    _CN5PUE = 0; // Disable pull-up resistor (CNPU1 register)
+void CN_config (void) {
+    //CNEN1 register
+    _CNxIE = 1;  // Enable CN on pin RLED
+    _CNxIE = 1;  // Enable CN on pin FLED
+    _CNxIE = 1;  // Enable CN on pin LLED
+
+
     _CNIP = 6;   // Set CN interrupt priority (IPC4 register)
     _CNIF = 0;   // Clear interrupt flag (IFS1 register)
     _CNIE = 1;   // Enable CN interrupts (IEC1 register)
 }
-
-void buttons_config (void) {
-    // asdf
-}
-
 
 void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void) {
     _T1IF = 0;        //Reset timer
@@ -144,21 +142,19 @@ void __attribute__((interrupt, no_auto_psv)) _T2Interrupt (void) {
 }
 void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void) {
     _CNIF = 0;
+
     if (RLED == 1 && (state == AIM || state == SHOOT)) {
-        // set duty for 180 deg position
+        OC2R = 0;
     }
-    if (FLED == 1 && (state == ROTATE || state == AIM || state == SHOOT)) {
-        // set duty for 90 deg position
+    else if (FLED == 1 && (state == AIM || state == SHOOT || state == ROTATE)) {
+        OC2R = 0;
     }
-    if (LLED == 1 && (state == AIM || state == SHOOT)) {
-        // set duty for 0 deg position
+    else if (LLED == 1 && (state == AIM || state == SHOOT)) {
+        OC2R = 0;
     }
-}
-void __attribute__((interrupt, no_auto_psv)) FLED (void) {
-    // set duty for 90 deg position
-}
-void __attribute__((interrupt, no_auto_psv)) LLED (void) {
-    // set duty for 0 deg position
+    else if (buttons == 1) {
+        state = COLLECT;
+    }
 }
 void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
     _OC1IF = 0;       //Clear interrupt flag
@@ -177,8 +173,8 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
             break;
         case FORWARD:
             if (steps < 1.872*rev) {
-                _LATB13 = 1;
-                _LATB12 = 1;
+                _LATB13 = 1; //pin 16
+                _LATB12 = 1; //pin 15
             }
             else {
                 state = AIM;
@@ -189,9 +185,6 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
             steps = 0;
             break;
     }
-}
-void __attribute__((interrupt, no_auto_psv)) _OC2Interrupt(void) {
-
 }
 void __attribute__((interrupt, no_auto_psv)) _OC3Interrupt(void) {
 

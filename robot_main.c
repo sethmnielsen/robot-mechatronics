@@ -36,6 +36,7 @@ int main(void) {
                 break;
             case AIM:
                 OC1R = 0;
+                OC2R = 0;
 
                 break;
             case SHOOT:
