@@ -41,10 +41,9 @@ int main(void) {
                 break;
             case AIM:
                 OC1R = 0;
-                _LATA0 = 1;
+                _LATA1 = 1;
                 break;
             case SHOOT:
-            _LATA0 = 1;
                 _LATB7 = 1;
                 T2_config();
                 break;

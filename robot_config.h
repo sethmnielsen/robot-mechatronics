@@ -82,9 +82,8 @@ void OC_config(void) {
     _OC1IP = 4; //OC1 Int Pri = 4
     _OC1IE = 1; //OC1 Int Pri enabled
     _OC1IF = 0; //OC1 clear Int Flag
-
     OC1CON1bits.OCTSEL = 0b111;     //Compare to system clock
-    OC1CON2bits.SYNCSEL = 0b11111;     //Compares to output compare module
+    OC1CON2bits.SYNCSEL = 0x1F;     //Compares to output compare module
     OC1CON2bits.OCTRIG = 0;         //Synchronizes to specified SYNCSEL value
     OC1CON1bits.OCM = 0b110;        //Edge aligned
 
@@ -97,10 +96,16 @@ void OC_config(void) {
     OC2CON2bits.OCTRIG = 0;         //Synchronizes to specified SYNCSEL value
     OC2CON1bits.OCM = 0b110;        //Edge aligned
 
-    OC2RS = 300;
-    OC2R = 0;
+    OC2RS = 310;
+    OC2R = OC2RS * 0.078;
+    // 0.03  = 0 deg?
+    // 0.078 = 90 deg
+    // 0.13  = 180 deg?
 
     //Ball Collection servo PWM configuration (Pin 5)
+    _OC3IP = 4; //OC1 Int Pri = 4
+    _OC3IE = 1; //OC1 Int Pri enabled
+    _OC3IF = 0; //OC1 clear Int Flag
     OC3CON1bits.OCTSEL = 0b111;     //Compare to system clock
     OC3CON2bits.SYNCSEL = 0x1F;     //Compares to output compare module
     OC3CON2bits.OCTRIG = 0;         //Synchronizes to specified SYNCSEL value
@@ -149,13 +154,14 @@ void CN_config (void) {
 void pins_config (void) {
     //outputs
     _TRISA0 = 0;
+    _TRISA1 = 0;
     _TRISB7 = 0;
     _TRISB12 = 0;
     _TRISB13 = 0;
     _TRISB14 = 0;
 
     //inputs
-    _TRISA1 = 1;
+    // _TRISA1 = 1;
     _TRISB2 = 1;
     _TRISA2 = 1;
     _TRISB4 = 1;
@@ -215,6 +221,7 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
 
     steps += 1;
 
+    _LATA0 = 1;
     switch (state) {
         case START:
             //Keep rotating until finds beam
@@ -226,21 +233,23 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
             //Drive until Button Interrupt
             break;
         case FORWARD:
-        // 1.872*rev
-            if (steps < 100) {
+            if (steps < 1.872*rev) {
                 _LATB12 = 1;
                 _LATB13 = 1;
             }
-            else if (steps > 100) {
+            else {
                 // If LED is on when arriving, turn to that LED
                 if (_RB4 == 1) { // R
                     // 0 deg
+                    OC2R = 0;
                 }
                 else if (_RA2 == 1) { // F
                     // 90 deg
+                    OC2R = 0;
                 }
                 else if (_RB2 == 1) { // L
                     // 180 deg
+                    OC2R = 0;
                 }
                 state = AIM;
             }
@@ -251,6 +260,7 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
    }
 }
 void __attribute__((interrupt, no_auto_psv)) _OC3Interrupt(void) {
+    _OC3IF = 0;       //Clear interrupt flag
 
 }
 
