@@ -3,21 +3,18 @@
  * Authors: Aaron Bame, Carson Zaugg, Seth Nielsen, Derek Sanchez
  * Comments:
  * Revision history: 10/22-Started
- * 11/4-state variables created, A/D configuration, OC config, FORWARD state - AB/SN
- *
- * To-do list:
- * AIM state
- * Servo config
  */
 
 
-#ifndef XC_HEADER_TEMPLATE_H
-#define	XC_HEADER_TEMPLATE_H
-#include <xc.h>
+#ifndef ROBOT_CONFIG_H
+#define	ROBOT_CONFIG_H
+#include "xc.h"
+#include <stdio.h>
+
 #pragma config FNOSC=LPRC //31kHz Oscillator
 
 // Global Variables
-enum state {OFF, START, ROTATE, REVERSE, COLLECT, FORWARD, AIM, SHOOT};
+enum action {OFF, START, ROTATE, REVERSE, COLLECT, FORWARD, AIM, SHOOT} state;
 
 int T2CNT = 0;              // save count of TMR2 for returning to SHOOT
 int steps = 0;
@@ -30,6 +27,7 @@ void OC_config(void);       //Configure PWM for driving motors
 void T1_config (void);      //Competition round
 void T2_config (void);      //Counting 6 balls
 void CN_config (void);
+void pins_config (void);
 
 //Interrupt Actions
 void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void);       //Timer1 interrupt
@@ -40,7 +38,12 @@ void __attribute__((interrupt, no_auto_psv)) _OC3Interrupt(void);       //Interr
 
 
 
-/********************************************** FUNCTION DECLARATIONS ************************************************/
+
+
+
+/********************************************** CONFIGURATIONS ************************************************/
+
+
 void ad_config () {
     _ADON = 0;    // AD1CON1<15> -- Turn off A/D during config
 
@@ -69,20 +72,33 @@ void ad_config () {
     //AD1CSS registers
     _CSS4 = 1;      //Pin 6 (Photodiode)
     _CSS13 = 1;     //Pin 7 (Photodiode)
-    _CSS14 = 1;     //Pin 8 (Photodiode)
+    _CSS15 = 1;     //Pin 9 (Photodiode)
 
     _ADON = 1;    // AD1CON1<15> -- Turn on A/D
 }
 
-void OC_cofig(void) {
-    //Stepper PWM configuration(Pin 14)
+void OC_config(void) {
+    //Stepper PWM configuration (Pin 14)
+    _OC1IP = 4; //OC1 Int Pri = 4
+    _OC1IE = 1; //OC1 Int Pri enabled
+    _OC1IF = 0; //OC1 clear Int Flag
+
     OC1CON1bits.OCTSEL = 0b111;     //Compare to system clock
-    OC1CON2bits.SYNCSEL = 0x1F;     //Compares to output compare module
+    OC1CON2bits.SYNCSEL = 0b11111;     //Compares to output compare module
     OC1CON2bits.OCTRIG = 0;         //Synchronizes to specified SYNCSEL value
     OC1CON1bits.OCM = 0b110;        //Edge aligned
 
-    OC1RS = 300;                    //Period
-    OC1R = 0;                       //Duty Cycle (0 = hold stationary)
+    OC1RS = 100;                    //Period
+    OC1R = 0.5*OC1RS;               //Duty Cycle
+
+    //Turret PWM configuration (Pin 4)
+    OC2CON1bits.OCTSEL = 0b111;     //Compare to system clock
+    OC2CON2bits.SYNCSEL = 0x1F;     //Compares to output compare module
+    OC2CON2bits.OCTRIG = 0;         //Synchronizes to specified SYNCSEL value
+    OC2CON1bits.OCM = 0b110;        //Edge aligned
+
+    OC2RS = 300;
+    OC2R = 0;
 
     //Ball Collection servo PWM configuration (Pin 5)
     OC3CON1bits.OCTSEL = 0b111;     //Compare to system clock
@@ -90,8 +106,8 @@ void OC_cofig(void) {
     OC3CON2bits.OCTRIG = 0;         //Synchronizes to specified SYNCSEL value
     OC3CON1bits.OCM = 0b110;        //Edge aligned
 
-    OC3RS = 300;                    //Period
-    OC3R = 0.5*OC2RS;               //Duty Cycle
+    OC3RS = 300;
+    OC3R = 0;
 }
 
 void T1_config (void) {
@@ -111,7 +127,7 @@ void T2_config (void) {
     T2CONbits.TCS = 0;
     T2CONbits.TCKPS = 0b11;   // prescale 1:256
 
-    PR2 = 5;                  //Set period for shooting 6 balls
+    PR2 = 5000;                  //Set period for shooting 6 balls
     TMR2 = T2CNT;             //Start at t=0
     _T2IP = 1;                //Highest Priority?
     _T2IE = 1;                //Enable the timer
@@ -120,9 +136,9 @@ void T2_config (void) {
 
 void CN_config (void) {
     //CNEN1 register
-    _CNxIE = 1;  // Enable CN on pin RLED
-    _CNxIE = 1;  // Enable CN on pin FLED
-    _CNxIE = 1;  // Enable CN on pin LLED
+    _CN6IE = 1;  // Enable CN on pin 6 (LLED)
+    _CN30IE = 1;  // Enable CN on pin 7 (FLED)
+    _CN1IE = 1;  // Enable CN on pin 9 (RLED)
 
 
     _CNIP = 6;   // Set CN interrupt priority (IPC4 register)
@@ -130,29 +146,67 @@ void CN_config (void) {
     _CNIE = 1;   // Enable CN interrupts (IEC1 register)
 }
 
+void pins_config (void) {
+    //outputs
+    _TRISA0 = 0;
+    _TRISB7 = 0;
+    _TRISB12 = 0;
+    _TRISB13 = 0;
+    _TRISB14 = 0;
+
+    //inputs
+    _TRISA1 = 1;
+    _TRISB2 = 1;
+    _TRISA2 = 1;
+    _TRISB4 = 1;
+
+    //analog
+    _ANSB2 = 1;
+    _ANSA2 = 1;
+    _ANSB4 = 1;
+
+    // stepper _SLEEP
+    _LATB14 = 1; // this consumes power
+}
+
+
+
+
+
+/********************************************** INTERRUPTS ************************************************/
+
+
+
 void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void) {
     _T1IF = 0;        //Reset timer
-    _TRISA = 0;
-    _TRISB = 0;
+    // state = OFF;
 }
 void __attribute__((interrupt, no_auto_psv)) _T2Interrupt (void) {
-    _T2IF = 0;        // Reset timer
-    T2CNT = TMR2;     // Save value of timer2
-    _LATB15 = 0;      // Pin 18 low, turn shooter motors off
+    _T2IF = 0;          // Reset timer
+    // T2CNT = TMR2;    // Save value of timer2
+    // _LATB7 = 0;      // Pin 18 low, turn shooter motors off
+    // state = REVERSE;
 }
 void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void) {
     _CNIF = 0;
 
-    if (RLED == 1 && (state == AIM || state == SHOOT)) {
+    //RLED
+    if (_RB4 == 1 && (state == AIM || state == SHOOT)) {
+        // 0 deg
         OC2R = 0;
     }
-    else if (FLED == 1 && (state == AIM || state == SHOOT || state == ROTATE)) {
+    //FLED
+    else if (_RA2 == 1 && (state == AIM || state == SHOOT || state == ROTATE)) {
+        // 90 deg
         OC2R = 0;
     }
-    else if (LLED == 1 && (state == AIM || state == SHOOT)) {
+    //RLED
+    else if (_RB2 == 1 && (state == AIM || state == SHOOT)) {
+        // 180 deg
         OC2R = 0;
     }
-    else if (buttons == 1) {
+    // buttons pressed
+    else if (_RA1 == 1) {
         state = COLLECT;
     }
 }
@@ -172,20 +226,32 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
             //Drive until Button Interrupt
             break;
         case FORWARD:
-            if (steps < 1.872*rev) {
-                _LATB13 = 1; //pin 16
-                _LATB12 = 1; //pin 15
+        // 1.872*rev
+            if (steps < 100) {
+                _LATB12 = 1;
+                _LATB13 = 1;
             }
-            else {
+            else if (steps > 100) {
+                // If LED is on when arriving, turn to that LED
+                if (_RB4 == 1) { // R
+                    // 0 deg
+                }
+                else if (_RA2 == 1) { // F
+                    // 90 deg
+                }
+                else if (_RB2 == 1) { // L
+                    // 180 deg
+                }
                 state = AIM;
-                steps = 0;
             }
             break;
-        default:
-            steps = 0;
-            break;
-    }
+       default:
+           steps = 0;
+           break;
+   }
 }
 void __attribute__((interrupt, no_auto_psv)) _OC3Interrupt(void) {
 
 }
+
+#endif

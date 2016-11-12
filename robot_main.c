@@ -6,20 +6,25 @@
  */
 
 #include "robot_config.h"
+#include "xc.h"
+#include <stdio.h>
 
 int main(void) {
 
     ad_config();
     OC_config();
+    T1_config();
+    CN_config();
+    pins_config();
 
-    //INCLUDE CONFIGURATION FUNCTIONS HERE!!!!!!!!!!
-    //configure all pins as inputs/outputs, digital
     state = FORWARD;
+
     while (1)
     {
         switch (state)
         {
             case OFF:
+                return 0;
                 break;
             case START:
                 break;
@@ -36,18 +41,16 @@ int main(void) {
                 break;
             case AIM:
                 OC1R = 0;
-                OC2R = 0;
-
+                _LATA0 = 1;
                 break;
             case SHOOT:
-                _LATB15 = 1;
-                config_timer2();
-                break;
-            default:
-                //????????????????
+            _LATA0 = 1;
+                _LATB7 = 1;
+                T2_config();
                 break;
         }
     }
+
 
 
     return 0;
