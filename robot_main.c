@@ -40,8 +40,7 @@ int main(void) {
                 OC1R = 0.5*OC1RS;
                 break;
             case AIM:
-                OC1R = 0;
-                _LATA1 = 1;
+                OC1R = 0; // steppers off
                 break;
             case SHOOT:
                 _LATB7 = 1;

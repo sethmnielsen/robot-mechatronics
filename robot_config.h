@@ -11,6 +11,10 @@
 #include "xc.h"
 #include <stdio.h>
 
+// Pins 8,9 and 10 are available
+#pragma config OSCIOFNC = OFF
+#pragma config SOSCSRC = DIG
+
 #pragma config FNOSC=LPRC //31kHz Oscillator
 
 // Global Variables
@@ -18,7 +22,7 @@ enum action {OFF, START, ROTATE, REVERSE, COLLECT, FORWARD, AIM, SHOOT} state;
 
 int T2CNT = 0;              // save count of TMR2 for returning to SHOOT
 int steps = 0;
-int rev = 400;              // steps for 1 revolution of wheels
+float rev = 400;              // steps for 1 revolution of wheels
 int turn180 = 326/0.9;      // steps for turning robot 180 deg
 
 //Configs
@@ -87,7 +91,7 @@ void OC_config(void) {
     OC1CON2bits.OCTRIG = 0;         //Synchronizes to specified SYNCSEL value
     OC1CON1bits.OCM = 0b110;        //Edge aligned
 
-    OC1RS = 100;                    //Period
+    OC1RS = 90;                     //Period
     OC1R = 0.5*OC1RS;               //Duty Cycle
 
     //Turret PWM configuration (Pin 4)
@@ -96,11 +100,11 @@ void OC_config(void) {
     OC2CON2bits.OCTRIG = 0;         //Synchronizes to specified SYNCSEL value
     OC2CON1bits.OCM = 0b110;        //Edge aligned
 
-    OC2RS = 310;
+    OC2RS = 309;
     OC2R = OC2RS * 0.078;
-    // 0.03  = 0 deg?
+    // 0.035 = 0 deg
     // 0.078 = 90 deg
-    // 0.13  = 180 deg?
+    // 0.13  = 180 deg
 
     //Ball Collection servo PWM configuration (Pin 5)
     _OC3IP = 4; //OC1 Int Pri = 4
@@ -197,19 +201,22 @@ void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void) {
     _CNIF = 0;
 
     //RLED
-    if (_RB4 == 1 && (state == AIM || state == SHOOT)) {
+    if ((ADC1BUF15/4095.0) >= 0.75 && (state == AIM || state == SHOOT)) {
         // 0 deg
-        OC2R = 0;
+        OC2R = 0.035 * OC2RS;
+        _LATA0 = 1;
     }
     //FLED
-    else if (_RA2 == 1 && (state == AIM || state == SHOOT || state == ROTATE)) {
+    else if ((ADC1BUF13/4095.0) >= 0.75 && (state == AIM || state == SHOOT || state == ROTATE)) {
         // 90 deg
-        OC2R = 0;
+        OC2R = 0.078 * OC2RS;
+        _LATA0 = 1;
     }
-    //RLED
-    else if (_RB2 == 1 && (state == AIM || state == SHOOT)) {
+    //LLED
+    else if ((ADC1BUF4/4095.0) >= 0.75 && (state == AIM || state == SHOOT)) {
         // 180 deg
-        OC2R = 0;
+        OC2R = 0.13 * OC2RS;
+        _LATA0 = 1;
     }
     // buttons pressed
     else if (_RA1 == 1) {
@@ -221,7 +228,6 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
 
     steps += 1;
 
-    _LATA0 = 1;
     switch (state) {
         case START:
             //Keep rotating until finds beam
@@ -233,23 +239,27 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
             //Drive until Button Interrupt
             break;
         case FORWARD:
-            if (steps < 1.872*rev) {
+        // 1.872*rev
+            if (steps < 815) {
                 _LATB12 = 1;
                 _LATB13 = 1;
             }
             else {
                 // If LED is on when arriving, turn to that LED
-                if (_RB4 == 1) { // R
+                if ((ADC1BUF15/4095.0) >= 0.75) { // R
                     // 0 deg
-                    OC2R = 0;
+                    _LATA0 = 1;
+                    OC2R = 0.035 * OC2RS;
                 }
-                else if (_RA2 == 1) { // F
+                else if ((ADC1BUF13/4095.0) >= 0.75) { // F
                     // 90 deg
-                    OC2R = 0;
+                    OC2R = 0.078 * OC2RS;
+                    _LATA0 = 1;
                 }
-                else if (_RB2 == 1) { // L
+                else if ((ADC1BUF4/4095.0) >= 0.75) { // L
                     // 180 deg
-                    OC2R = 0;
+                    OC2R = 0.13 * OC2RS;
+                    _LATA0 = 1;
                 }
                 state = AIM;
             }
