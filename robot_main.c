@@ -11,10 +11,10 @@
 
 int main(void) {
 
-    ad_config();
     OC_config();
     T1_config();
     CN_config();
+    comp_config();
     pins_config();
 
     state = FORWARD;

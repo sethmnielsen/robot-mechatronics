@@ -26,11 +26,12 @@ float rev = 400;              // steps for 1 revolution of wheels
 int turn180 = 326/0.9;      // steps for turning robot 180 deg
 
 //Configs
-void ad_config (void);      //LED sensors
+// void ad_config (void);      //LED sensors
 void OC_config(void);       //Configure PWM for driving motors
 void T1_config (void);      //Competition round
 void T2_config (void);      //Counting 6 balls
-void CN_config (void);
+void CN_config (void);      //Change Notification Interrupt
+void comp_config (void);    //Comparator Interrupt - Infra sensors
 void pins_config (void);
 
 //Interrupt Actions
@@ -46,40 +47,6 @@ void __attribute__((interrupt, no_auto_psv)) _OC3Interrupt(void);       //Interr
 
 
 /********************************************** CONFIGURATIONS ************************************************/
-
-
-void ad_config () {
-    _ADON = 0;    // AD1CON1<15> -- Turn off A/D during config
-
-    // AD1CON1 register
-    _ADSIDL = 0;  // AD1CON1<13> -- A/D continues in idle mode
-    _MODE12 = 1;  // AD1CON1<10> -- 12-bit A/D operation
-    _FORM = 0;    // AD1CON1<9:8> -- Unsigned integer output
-    _SSRC = 7;    // AD1CON1<7:4> -- Auto conversion (internal counter)
-    _ASAM = 1;    // AD1CON1<2> -- Auto sampling
-
-    // AD1CON2 register
-    _PVCFG = 0;   // AD1CON2<15:14> -- Use VDD as positive ref voltage
-    _NVCFG = 0;   // AD1CON2<13> -- Use VSS as negative ref voltage
-    _BUFREGEN = 1;// AD1CON2<11> -- Result appears in buffer location corresponding to channel
-    _CSCNA = 1;   // AD1CON2<10> -- Does not scan inputs(0) Scans inputs (1)
-                  // specified in AD1CSSx registers (instead uses channels specified by CH0SA bits in AD1CHS register)
-                  //-- Selecting '0' here probably makes writing to the AD1CSSL register unnecessary.
-    _SMPI = 2;    // AD1CON2<6:2> -- Each conversion sent to buffer (# of scanning pins - 1)
-    _ALTS = 0;    // AD1CON2<0> -- Sample MUXA only
-
-    // AD1CON3 register
-    _ADRC = 0;    // AD1CON3<15> -- Use system clock
-    _SAMC = 1;    // AD1CON3<12:8> -- Auto sample every A/D period TAD
-    _ADCS = 0x3F; // AD1CON3<7:0> -- A/D period TAD = 64*TCY
-
-    //AD1CSS registers
-    _CSS4 = 1;      //Pin 6 (Photodiode)
-    _CSS13 = 1;     //Pin 7 (Photodiode)
-    _CSS15 = 1;     //Pin 9 (Photodiode)
-
-    _ADON = 1;    // AD1CON1<15> -- Turn on A/D
-}
 
 void OC_config(void) {
     //Stepper PWM configuration (Pin 14)
@@ -102,7 +69,7 @@ void OC_config(void) {
 
     OC2RS = 309;
     OC2R = OC2RS * 0.078;
-    // 0.035 = 0 deg
+    // 0.03 = 0 deg
     // 0.078 = 90 deg
     // 0.13  = 180 deg
 
@@ -145,38 +112,69 @@ void T2_config (void) {
 
 void CN_config (void) {
     //CNEN1 register
-    _CN6IE = 1;  // Enable CN on pin 6 (LLED)
-    _CN30IE = 1;  // Enable CN on pin 7 (FLED)
-    _CN1IE = 1;  // Enable CN on pin 9 (RLED)
-
+    _CN0IE = 1;  // Enable CN on pin 10 (LLED)
 
     _CNIP = 6;   // Set CN interrupt priority (IPC4 register)
     _CNIF = 0;   // Clear interrupt flag (IFS1 register)
     _CNIE = 1;   // Enable CN interrupts (IEC1 register)
 }
 
+void comp_config (void) {
+    //configure voltage reference
+    _CVROE = 0;     // Voltage reference output is internal only
+    _CVRSS = 0;     // Vdd and Vss as reference voltages
+    _CVR = 0x10;    // set Vref at 16/32*(Vdd-Vss) = 1.65 V (0x10 == 16)
+    _CVREN = 1;     // enable the module
+
+    //configure comparator
+    //FLED
+    CM1CONbits.CON = 1;         //enable module for configuration
+    CM1CONbits.COE = 0;         //comparator output is internal only
+    CM1CONbits.CPOL = 1;        //comparator output is inverted (output high when Vin+ < Vin-)
+    CM1CONbits.EVPOL = 0b10;    //interrupt on low-high transition
+    CM1CONbits.CREF = 1;        //Vin+ connected to internal Vref
+    CM1CONbits.CCH = 0b00;      //Vin- connected to C1INB (pin 7)
+
+    //RLED
+    CM2CONbits.CON = 1;         //enable module for configuration
+    CM2CONbits.COE = 0;         //comparator output is internal only
+    CM2CONbits.CPOL = 1;        //comparator output is inverted (output high when Vin+ < Vin-)
+    CM2CONbits.EVPOL = 0b10;    //interrupt on low-high transition
+    CM2CONbits.CREF = 1;        //Vin+ connected to internal Vref
+    CM2CONbits.CCH = 0b01;      //Vin- connected to C2INC (pin 8)
+
+    //LLED
+    CM3CONbits.CON = 1;         //enable module for configuration
+    CM3CONbits.COE = 0;         //comparator output is internal only
+    CM3CONbits.CPOL = 1;        //comparator output is inverted (output high when Vin+ < Vin-)
+    CM3CONbits.EVPOL = 0b10;    //interrupt on low-high transition
+    CM3CONbits.CREF = 1;        //Vin+ connected to internal Vref
+    CM3CONbits.CCH = 0b01;      //Vin- connected to C3INC (pin 7)
+
+    //configure interrupt
+    CM1CONbits.CEVT = 0;
+    CM2CONbits.CEVT = 0;
+    CM3CONbits.CEVT = 0;
+    _CMIF = 0;
+    _CMIE = 1;
+}
+
 void pins_config (void) {
     //outputs
-    _TRISA0 = 0;
-    _TRISA1 = 0;
+    _TRISB4 = 0;
     _TRISB7 = 0;
     _TRISB12 = 0;
     _TRISB13 = 0;
     _TRISB14 = 0;
 
     //inputs
-    // _TRISA1 = 1;
-    _TRISB2 = 1;
+    _TRISA0 = 1;
     _TRISA2 = 1;
-    _TRISB4 = 1;
-
-    //analog
-    _ANSB2 = 1;
-    _ANSA2 = 1;
-    _ANSB4 = 1;
+    _TRISA3 = 1;
+    _TRISA4 = 1;
 
     // stepper _SLEEP
-    _LATB14 = 1; // this consumes power
+    _LATB14 = 1;
 }
 
 
@@ -200,28 +198,36 @@ void __attribute__((interrupt, no_auto_psv)) _T2Interrupt (void) {
 void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void) {
     _CNIF = 0;
 
-    //RLED
-    if ((ADC1BUF15/4095.0) >= 0.75 && (state == AIM || state == SHOOT)) {
-        // 0 deg
-        OC2R = 0.035 * OC2RS;
-        _LATA0 = 1;
-    }
-    //FLED
-    else if ((ADC1BUF13/4095.0) >= 0.75 && (state == AIM || state == SHOOT || state == ROTATE)) {
-        // 90 deg
-        OC2R = 0.078 * OC2RS;
-        _LATA0 = 1;
-    }
-    //LLED
-    else if ((ADC1BUF4/4095.0) >= 0.75 && (state == AIM || state == SHOOT)) {
-        // 180 deg
-        OC2R = 0.13 * OC2RS;
-        _LATA0 = 1;
-    }
     // buttons pressed
-    else if (_RA1 == 1) {
+    if (_RA1 == 1) {
         state = COLLECT;
     }
+}
+void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
+    _CMIF = 0; // clear interrupt flag
+
+    //FLED
+    if (CM1CONbits.CEVT == 1 && (state == FORWARD || state == AIM || state == SHOOT || state == START)) {
+        // 90 deg
+        OC2R = 0.078 * OC2RS;
+        if (state == START) {
+            state = ROTATE;
+        }
+    }
+    //RLED
+    else if (CM2CONbits.CEVT == 1 && (state == FORWARD || state == AIM || state == SHOOT)) {
+        // 0 deg
+        OC2R = 0.03 * OC2RS;
+    }
+    //LLED
+    else if (CM3CONbits.CEVT == 1 && (state == FORWARD || state == AIM || state == SHOOT)) {
+        // 180 deg
+        OC2R = 0.13 * OC2RS;
+    }
+
+    CM1CONbits.CEVT = 0;
+    CM2CONbits.CEVT = 0;
+    CM3CONbits.CEVT = 0;
 }
 void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
     _OC1IF = 0;       //Clear interrupt flag
@@ -240,26 +246,23 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
             break;
         case FORWARD:
         // 1.872*rev
-            if (steps < 815) {
+            if (steps < 805) {
                 _LATB12 = 1;
                 _LATB13 = 1;
             }
             else {
                 // If LED is on when arriving, turn to that LED
-                if ((ADC1BUF15/4095.0) >= 0.75) { // R
+                if (_C2OUT == 1) { // R
                     // 0 deg
-                    _LATA0 = 1;
-                    OC2R = 0.035 * OC2RS;
+                    OC2R = 0.03 * OC2RS;
                 }
-                else if ((ADC1BUF13/4095.0) >= 0.75) { // F
+                else if (_C1OUT == 1) { // F
                     // 90 deg
                     OC2R = 0.078 * OC2RS;
-                    _LATA0 = 1;
                 }
-                else if ((ADC1BUF4/4095.0) >= 0.75) { // L
+                else if (_C3OUT == 1) { // L
                     // 180 deg
                     OC2R = 0.13 * OC2RS;
-                    _LATA0 = 1;
                 }
                 state = AIM;
             }
