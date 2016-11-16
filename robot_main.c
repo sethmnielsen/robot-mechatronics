@@ -13,11 +13,14 @@ int main(void) {
 
     OC_config();
     T1_config();
+    T3_config();
+    T4_config();
     CN_config();
     comp_config();
     pins_config();
 
-    state = FORWARD;
+    _LATA1 = 1;
+    state = START;
 
     while (1)
     {
@@ -27,11 +30,13 @@ int main(void) {
                 return 0;
                 break;
             case START:
+                OC1R = OC1RS*0.5;
                 break;
             case ROTATE:
                 break;
             case REVERSE:
-                OC1R = 0.5*OC1RS;
+                OC1R = OC1RS*0.5;
+                OC2R = OC2RS * 0.078;
                 break;
             case COLLECT:
                 OC1R = 0;

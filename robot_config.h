@@ -22,8 +22,7 @@ enum action {OFF, START, ROTATE, REVERSE, COLLECT, FORWARD, AIM, SHOOT} state;
 
 int T2CNT = 0;              // save count of TMR2 for returning to SHOOT
 int steps = 0;
-float rev = 400;              // steps for 1 revolution of wheels
-int turn180 = 326/0.9;      // steps for turning robot 180 deg
+int angle = 0;
 
 //Configs
 // void ad_config (void);      //LED sensors
@@ -58,8 +57,8 @@ void OC_config(void) {
     OC1CON2bits.OCTRIG = 0;         //Synchronizes to specified SYNCSEL value
     OC1CON1bits.OCM = 0b110;        //Edge aligned
 
-    OC1RS = 90;                     //Period
-    OC1R = 0.5*OC1RS;               //Duty Cycle
+    OC1RS = 70;                     //Period
+    OC1R = OC1RS*0.5;               //Duty Cycle
 
     //Turret PWM configuration (Pin 4)
     OC2CON1bits.OCTSEL = 0b111;     //Compare to system clock
@@ -82,7 +81,7 @@ void OC_config(void) {
     OC3CON2bits.OCTRIG = 0;         //Synchronizes to specified SYNCSEL value
     OC3CON1bits.OCM = 0b110;        //Edge aligned
 
-    OC3RS = 300;
+    OC3RS = 309;
     OC3R = 0;
 }
 
@@ -103,11 +102,39 @@ void T2_config (void) {
     T2CONbits.TCS = 0;
     T2CONbits.TCKPS = 0b11;   // prescale 1:256
 
-    PR2 = 5000;                  //Set period for shooting 6 balls
+    PR2 = 5000;               //Set period for shooting 6 balls
     TMR2 = T2CNT;             //Start at t=0
     _T2IP = 1;                //Highest Priority?
     _T2IE = 1;                //Enable the timer
     _T2IF = 0;                //Clear the flag
+}
+
+void T3_config (void) {
+    T3CONbits.TON = 1;
+    T3CONbits.TCS = 0;
+    T3CONbits.TCKPS = 0b11;
+
+    //Configure Timer1 interrupt
+    TMR3 = 0;
+    _T3IP = 4; //T1 Int Pri = 4
+    _T3IE = 1; //T1 Int Pri enabled
+    _T3IF = 0; //T1 clear Int Flag
+
+    PR3 = 30;
+}
+
+void T4_config (void) {
+    T4CONbits.TON = 1;
+    T4CONbits.TCS = 0;
+    T4CONbits.TCKPS = 0b11;
+
+    //Configure Timer1 interrupt
+    TMR4 = 0;
+    _T4IP = 2; //T1 Int Pri = 4
+    _T4IE = 1; //T1 Int Pri enabled
+    _T4IF = 0; //T1 clear Int Flag
+
+    PR4 = 180;
 }
 
 void CN_config (void) {
@@ -161,6 +188,7 @@ void comp_config (void) {
 
 void pins_config (void) {
     //outputs
+    _TRISA1 = 0;
     _TRISB4 = 0;
     _TRISB7 = 0;
     _TRISB12 = 0;
@@ -181,20 +209,47 @@ void pins_config (void) {
 
 
 
+
+
 /********************************************** INTERRUPTS ************************************************/
-
-
 
 void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void) {
     _T1IF = 0;        //Reset timer
     // state = OFF;
 }
+
 void __attribute__((interrupt, no_auto_psv)) _T2Interrupt (void) {
     _T2IF = 0;          // Reset timer
     // T2CNT = TMR2;    // Save value of timer2
     // _LATB7 = 0;      // Pin 18 low, turn shooter motors off
     // state = REVERSE;
 }
+
+void __attribute__((interrupt, no_auto_psv)) _T3Interrupt (void) {
+    _T3IF = 0;        //Reset timer
+
+    if (state == COLLECT && angle == 45) {
+        OC3R = 0.104*OC3RS;
+        angle = 135;
+    }
+    else if (state == COLLECT && angle == 135) {
+        OC3R = 0.056*OC3RS;
+        angle = 45;
+    }
+    else if (state != COLLECT) {
+        OC3R = 0;
+    }
+}
+
+void __attribute__((interrupt, no_auto_psv)) _T4Interrupt (void) {
+    _T4IF = 0;        //Reset timer
+
+    if (state == COLLECT) {
+        steps = 0;
+        state = FORWARD;
+    }
+}
+
 void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void) {
     _CNIF = 0;
 
@@ -203,6 +258,7 @@ void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void) {
         state = COLLECT;
     }
 }
+
 void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
     _CMIF = 0; // clear interrupt flag
 
@@ -211,6 +267,7 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
         // 90 deg
         OC2R = 0.078 * OC2RS;
         if (state == START) {
+            steps = 0;
             state = ROTATE;
         }
     }
@@ -229,6 +286,7 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
     CM2CONbits.CEVT = 0;
     CM3CONbits.CEVT = 0;
 }
+
 void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
     _OC1IF = 0;       //Clear interrupt flag
 
@@ -237,15 +295,43 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
     switch (state) {
         case START:
             //Keep rotating until finds beam
+            _LATB12 = 1;
+            _LATB13 = 0;
             break;
         case ROTATE:
             //rotate 180 deg
+            if (steps < 300) {
+                _LATB12 = 1;
+                _LATB13 = 0;
+            }
+            else {
+                steps = 0;
+                state = REVERSE;
+            }
             break;
         case REVERSE:
             //Drive until Button Interrupt
+            _LATB12 = 0;
+            _LATB13 = 0;
+
+            _LATB4 = 1; // buttons_out is high
+
+            // CHANGE IFs TO BE IF _RA4 IS LOW OR HIGH
+            if (steps < 300) {
+                _LATB12 = 1;
+                _LATB13 = 0;
+            }
+            else {
+                steps = 0;
+                _LATB4 = 0;
+                TMR3 = 0;            // left-right paddling
+                TMR4 = 0;            // count time to collect 6 balls
+                OC3R = 0.056*OC3RS;  // start paddling servo at 45 deg
+                angle = 45;
+                state = COLLECT;
+            }
             break;
         case FORWARD:
-        // 1.872*rev
             if (steps < 805) {
                 _LATB12 = 1;
                 _LATB13 = 1;
@@ -264,6 +350,7 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
                     // 180 deg
                     OC2R = 0.13 * OC2RS;
                 }
+                steps = 0;
                 state = AIM;
             }
             break;
@@ -271,10 +358,6 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
            steps = 0;
            break;
    }
-}
-void __attribute__((interrupt, no_auto_psv)) _OC3Interrupt(void) {
-    _OC3IF = 0;       //Clear interrupt flag
-
 }
 
 #endif
