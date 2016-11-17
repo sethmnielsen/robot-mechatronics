@@ -22,7 +22,8 @@ enum action {OFF, START, ROTATE, REVERSE, COLLECT, FORWARD, AIM, SHOOT} state;
 
 int T2CNT = 0;              // save count of TMR2 for returning to SHOOT
 int steps = 0;
-int angle = 0;
+int angle_pad = 0;
+int angle_tur = 0;
 
 //Configs
 // void ad_config (void);      //LED sensors
@@ -38,7 +39,6 @@ void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void);       //Timer1
 void __attribute__((interrupt, no_auto_psv)) _T2Interrupt(void);        //Timer2 interrupt
 void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void);       //Change notification for LEDs, buttons
 void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void);       //Interrupt for stepper period counter
-void __attribute__((interrupt, no_auto_psv)) _OC3Interrupt(void);       //Interrupt for ball collector servo
 
 
 
@@ -57,7 +57,7 @@ void OC_config(void) {
     OC1CON2bits.OCTRIG = 0;         //Synchronizes to specified SYNCSEL value
     OC1CON1bits.OCM = 0b110;        //Edge aligned
 
-    OC1RS = 70;                     //Period
+    OC1RS = 140;                     //Period
     OC1R = OC1RS*0.5;               //Duty Cycle
 
     //Turret PWM configuration (Pin 4)
@@ -68,14 +68,12 @@ void OC_config(void) {
 
     OC2RS = 309;
     OC2R = OC2RS * 0.078;
+    angle_tur = 90;
     // 0.03 = 0 deg
     // 0.078 = 90 deg
     // 0.13  = 180 deg
 
     //Ball Collection servo PWM configuration (Pin 5)
-    _OC3IP = 4; //OC1 Int Pri = 4
-    _OC3IE = 1; //OC1 Int Pri enabled
-    _OC3IF = 0; //OC1 clear Int Flag
     OC3CON1bits.OCTSEL = 0b111;     //Compare to system clock
     OC3CON2bits.SYNCSEL = 0x1F;     //Compares to output compare module
     OC3CON2bits.OCTRIG = 0;         //Synchronizes to specified SYNCSEL value
@@ -102,7 +100,7 @@ void T2_config (void) {
     T2CONbits.TCS = 0;
     T2CONbits.TCKPS = 0b11;   // prescale 1:256
 
-    PR2 = 5000;               //Set period for shooting 6 balls
+    PR2 = 300;               //Set period for shooting 6 balls
     TMR2 = T2CNT;             //Start at t=0
     _T2IP = 1;                //Highest Priority?
     _T2IE = 1;                //Enable the timer
@@ -120,7 +118,7 @@ void T3_config (void) {
     _T3IE = 1; //T1 Int Pri enabled
     _T3IF = 0; //T1 clear Int Flag
 
-    PR3 = 30;
+    PR3 = 60;
 }
 
 void T4_config (void) {
@@ -134,7 +132,21 @@ void T4_config (void) {
     _T4IE = 1; //T1 Int Pri enabled
     _T4IF = 0; //T1 clear Int Flag
 
-    PR4 = 180;
+    PR4 = 360;
+}
+
+void T5_config (void) {
+    T5CONbits.TON = 1;
+    T5CONbits.TCS = 0;
+    T5CONbits.TCKPS = 0b11;
+
+    //Configure Timer1 interrupt
+    TMR5 = 0;
+    _T5IP = 2; //T1 Int Pri = 4
+    _T5IE = 1; //T1 Int Pri enabled
+    _T5IF = 0; //T1 clear Int Flag
+
+    PR5 = 60;
 }
 
 void CN_config (void) {
@@ -150,7 +162,7 @@ void comp_config (void) {
     //configure voltage reference
     _CVROE = 0;     // Voltage reference output is internal only
     _CVRSS = 0;     // Vdd and Vss as reference voltages
-    _CVR = 0x10;    // set Vref at 16/32*(Vdd-Vss) = 1.65 V (0x10 == 16)
+    _CVR = 0x1D;    // set Vref at 29/32*(Vdd-Vss) = 2.99 V (0x1D == 29)
     _CVREN = 1;     // enable the module
 
     //configure comparator
@@ -219,22 +231,24 @@ void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void) {
 }
 
 void __attribute__((interrupt, no_auto_psv)) _T2Interrupt (void) {
-    _T2IF = 0;          // Reset timer
-    // T2CNT = TMR2;    // Save value of timer2
-    // _LATB7 = 0;      // Pin 18 low, turn shooter motors off
-    // state = REVERSE;
+    _T2IF = 0;       // Reset timer
+    if (state == SHOOT) {
+        T2CNT = TMR2;    // Save value of timer2
+        _LATB7 = 0;      // turn shooter motors off
+        state = REVERSE;
+    }
 }
 
 void __attribute__((interrupt, no_auto_psv)) _T3Interrupt (void) {
     _T3IF = 0;        //Reset timer
 
-    if (state == COLLECT && angle == 45) {
+    if (state == COLLECT && angle_pad == 45) {
         OC3R = 0.104*OC3RS;
-        angle = 135;
+        angle_pad = 135;
     }
-    else if (state == COLLECT && angle == 135) {
+    else if (state == COLLECT && angle_pad == 135) {
         OC3R = 0.056*OC3RS;
-        angle = 45;
+        angle_pad = 45;
     }
     else if (state != COLLECT) {
         OC3R = 0;
@@ -250,13 +264,22 @@ void __attribute__((interrupt, no_auto_psv)) _T4Interrupt (void) {
     }
 }
 
+void __attribute__((interrupt, no_auto_psv)) _T5Interrupt (void) {
+    _T5IF = 0;        //Reset timer
+    if (state == AIM && (_C1OUT == 1 || _C2OUT == 1 || _C3OUT == 1)) {
+        state = SHOOT;
+        T2CNT = 0;
+    }
+    PR5 = 60;
+}
+
 void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void) {
     _CNIF = 0;
 
     // buttons pressed
-    if (_RA1 == 1) {
-        state = COLLECT;
-    }
+    // if (_RA1 == 1) {
+    //     state = COLLECT;
+    // }
 }
 
 void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
@@ -266,6 +289,9 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
     if (CM1CONbits.CEVT == 1 && (state == FORWARD || state == AIM || state == SHOOT || state == START)) {
         // 90 deg
         OC2R = 0.078 * OC2RS;
+        angle_tur = 90;
+        TMR5 = 0;
+        state = AIM;
         if (state == START) {
             steps = 0;
             state = ROTATE;
@@ -274,12 +300,24 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
     //RLED
     else if (CM2CONbits.CEVT == 1 && (state == FORWARD || state == AIM || state == SHOOT)) {
         // 0 deg
-        OC2R = 0.03 * OC2RS;
+        OC2R = 0.13 * OC2RS;
+        angle_tur = 180;
+        TMR5 = 0;
+        state = AIM;
+        if (angle_tur == 0) {
+            PR5 = 120;
+        }
     }
     //LLED
     else if (CM3CONbits.CEVT == 1 && (state == FORWARD || state == AIM || state == SHOOT)) {
         // 180 deg
-        OC2R = 0.13 * OC2RS;
+        OC2R = 0.03 * OC2RS;
+        angle_tur = 0;
+        TMR5 = 0;
+        state = AIM;
+        if (angle_tur == 180) {
+            PR5 = 120;
+        }
     }
 
     CM1CONbits.CEVT = 0;
@@ -299,35 +337,35 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
             _LATB13 = 0;
             break;
         case ROTATE:
-            //rotate 180 deg
+            //180 deg = 350
             if (steps < 300) {
-                _LATB12 = 1;
-                _LATB13 = 0;
+                _LATB12 = 0;
+                _LATB13 = 1;
             }
-            else {
+            else if (steps >= 300) {
                 steps = 0;
                 state = REVERSE;
             }
             break;
         case REVERSE:
             //Drive until Button Interrupt
-            _LATB12 = 0;
-            _LATB13 = 0;
+            // _LATB12 = 0;
+            // _LATB13 = 0;
 
-            _LATB4 = 1; // buttons_out is high
+            // _LATB4 = 1; // buttons_out is high
 
             // CHANGE IFs TO BE IF _RA4 IS LOW OR HIGH
-            if (steps < 300) {
-                _LATB12 = 1;
+            if (steps < 900) {
+                _LATB12 = 0;
                 _LATB13 = 0;
             }
-            else {
+            else if (steps >= 900) {
                 steps = 0;
                 _LATB4 = 0;
                 TMR3 = 0;            // left-right paddling
                 TMR4 = 0;            // count time to collect 6 balls
                 OC3R = 0.056*OC3RS;  // start paddling servo at 45 deg
-                angle = 45;
+                angle_pad = 45;
                 state = COLLECT;
             }
             break;
@@ -338,20 +376,26 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
             }
             else {
                 // If LED is on when arriving, turn to that LED
+                state = AIM;
+                steps = 0;
                 if (_C2OUT == 1) { // R
                     // 0 deg
-                    OC2R = 0.03 * OC2RS;
+                    OC2R = 0.13 * OC2RS;
+                    angle_tur = 180;
+                    TMR5 = 0;
                 }
                 else if (_C1OUT == 1) { // F
                     // 90 deg
                     OC2R = 0.078 * OC2RS;
+                    angle_tur = 90;
+                    TMR5 = 0;
                 }
                 else if (_C3OUT == 1) { // L
                     // 180 deg
-                    OC2R = 0.13 * OC2RS;
+                    OC2R = 0.03 * OC2RS;
+                    angle_tur = 0;
+                    TMR5 = 0;
                 }
-                steps = 0;
-                state = AIM;
             }
             break;
        default:

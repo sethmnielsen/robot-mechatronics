@@ -15,11 +15,11 @@ int main(void) {
     T1_config();
     T3_config();
     T4_config();
+    T5_config();
     CN_config();
     comp_config();
     pins_config();
-
-    _LATA1 = 1;
+    
     state = START;
 
     while (1)
@@ -30,7 +30,7 @@ int main(void) {
                 return 0;
                 break;
             case START:
-                OC1R = OC1RS*0.5;
+                OC1R = OC1RS*0.5; // steppers
                 break;
             case ROTATE:
                 break;
