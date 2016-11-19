@@ -15,7 +15,7 @@
 #pragma config OSCIOFNC = OFF
 #pragma config SOSCSRC = DIG
 
-#pragma config FNOSC = FRC // 8 MHz Oscillator
+#pragma config FNdOSC = FRC // 8 MHz Oscillator
 
 // Global Variables
 enum action {OFF, START, ROTATE, REVERSE, COLLECT, FORWARD, AIM, SHOOT} state;
@@ -27,7 +27,7 @@ int angle_pad = 0;   // angle of 'paddle' servo (ball collection)
 int angle_tur = 0;   // angle of turret servo
 int pad_count = 0;   // swipes of paddle servo
 int has_aimed = 0;   // if aimed while in forward state, shot right away
-int time3 = 0;
+int stopped = 0;     // stopped at center X
 
 //Configs
 void OC_config(void);       //Configure PWM for driving motors
@@ -43,6 +43,9 @@ void pins_config (void);
 //Interrupt Actions
 void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void);       //Timer1 interrupt
 void __attribute__((interrupt, no_auto_psv)) _T2Interrupt(void);        //Timer2 interrupt
+void __attribute__((interrupt, no_auto_psv)) _T3Interrupt (void);       //Timer1 interrupt
+void __attribute__((interrupt, no_auto_psv)) _T4Interrupt (void);       //Timer1 interrupt
+void __attribute__((interrupt, no_auto_psv)) _T5Interrupt (void);       //Timer1 interrupt
 void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void);       //Change notification for LEDs, buttons
 void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void);       //Interrupt for stepper period counter
 
@@ -65,7 +68,6 @@ void OC_config(void) {
 
     OC1RS = 18000;                  //Period
     OC1R = 0.5*OC1RS;               //Duty Cycle
-    // OC1R = 0;
 
     //Turret PWM configuration (Pin 4)
     OC2CON1bits.OCTSEL = 0b100;     //Set OC to Timer 1 (100)
@@ -74,7 +76,7 @@ void OC_config(void) {
     OC2CON1bits.OCM = 0b110;        //Edge aligned PWM mode
 
     OC2RS = 313;
-    OC2R = OC2RS * 0.075;
+    OC2R = 0.075*OC2RS;
     angle_tur = 90;
     // 0.03 = 0 deg
     // 0.075 = 90 deg
@@ -111,7 +113,7 @@ void T2_config (void) {
     T2CONbits.T32 = 0;
     T2CONbits.TCKPS = 0b11;   // prescale 1:256
 
-    PR2 = 14999;    //Set period for shoting 6 balls
+    PR2 = 29999;    //Set period for shoting 6 balls
     // TMR2 = T2CNT;   //Start at t=0
     TMR2 = 0;
     _T2IP = 5;      //Int Pri
@@ -167,7 +169,8 @@ void CN_config (void) {
     //CNEN1 register
     _CN0IE = 1;  // Enable CN on pin 10 (LLED)
 
-    _CNIP = 1;   // Set CN interrupt priority (IPC4 register)
+    _CN5PUE = 0; // Disable pull-up resistor (CNPU1 register)
+    _CNIP = 7;   // Set CN interrupt priority (IPC4 register)
     _CNIF = 0;   // Clear interrupt flag (IFS1 register)
     _CNIE = 1;   // Enable CN interrupts (IEC1 register)
 }
@@ -255,13 +258,13 @@ void __attribute__((interrupt, no_auto_psv)) _T2Interrupt (void) {
         T2CNT = 0;
         // turn DC motors off
         steps = 0;
+        OC2R = 0.075*OC2RS;
         state = REVERSE;
     }
 }
 
 void __attribute__((interrupt, no_auto_psv)) _T3Interrupt (void) {
     _T3IF = 0;        //Reset timer
-    _LATB7 = 1;
     if (state == COLLECT && pad_count >= 6) {
         OC3R = 0.06*OC3RS;
         angle_pad = 90;
@@ -293,7 +296,7 @@ void __attribute__((interrupt, no_auto_psv)) _T4Interrupt (void) {
 void __attribute__((interrupt, no_auto_psv)) _T5Interrupt (void) {
     _T5IF = 0;        //Reset timer
 
-    if (state == AIM && has_aimed == 1) {
+    if (stopped == 1 && has_aimed == 1) {
         has_aimed = 0;
         TMR2 = 0;
         state = SHOOT;
@@ -302,11 +305,14 @@ void __attribute__((interrupt, no_auto_psv)) _T5Interrupt (void) {
 
 void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void) {
     _CNIF = 0;
-
     // buttons pressed
-    // if (_RA1 == 1) {
-    //     state = COLLECT;
-    // }
+    if (_RA4 == 1 && state == REVERSE) {
+        _LATB4 = 0;
+        TMR3 = 0;           // left-right paddling
+        angle_pad = 90;
+        pad_count = 0;
+        state = COLLECT;
+    }
 }
 
 void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
