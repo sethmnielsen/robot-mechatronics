@@ -22,7 +22,6 @@ int main(void) {
     pins_config();
 
     state = START;
-
     while (1)
     {
         switch (state)
@@ -31,11 +30,12 @@ int main(void) {
                 return 0;
                 break;
             case START:
-                //Keep rotating until finds beam
+                // Keep rotating until finds beam
                 _LATB12 = 1;
                 _LATB13 = 0;
                 break;
             case ROTATE:
+                // Rotate opposite direction to face corner
                 //180 deg = 350
                 if (steps < 300) {
                     _LATB12 = 0;
@@ -47,20 +47,21 @@ int main(void) {
                 }
                 break;
             case REVERSE:
+                // Drive towards corner until buttons pressed
                 stopped = 0;
-                _LATB7 = 0;
-                _LATB4 = 1; // buttons_out is high
-
-                _LATB12 = 0;
+                _LATB7 = 0;  // shoting motors
+                _LATB4 = 1;  // buttons_out
+                _LATB12 = 0; // steppers
                 _LATB13 = 0;
                 OC1R = 0.5*OC1RS;
                 break;
             case COLLECT:
+                // Swipe paddle to collect 6 balls
                 _LATB4 = 0; // buttons_out
-                OC1R = 0;
+                OC1R = 0;   // steppers
                 break;
             case FORWARD:
-            // 805
+                // Drive to center, aim for active goal
                 stopped = 0;
                 if (steps < 805) {
                     _LATB12 = 1;
@@ -69,15 +70,17 @@ int main(void) {
                 }
                 else if (steps >= 805) {
                     state = AIM;
-                    TMR4 = 0;
+                    TMR4 = 0; // time needed to aim
                     OC1R = 0;
                     stopped = 1;
                     steps = 0;
                 }
                 break;
             case AIM:
-                _LATB7 = 0;
+                // Rotate turret to face active goal (either stopped or driving forward)
+                _LATB7 = 0; // shoting motors
                 if (steps < 805) {
+                    // keep driving if not yet at center
                     _LATB12 = 1;
                     _LATB13 = 1;
                 }
@@ -88,7 +91,7 @@ int main(void) {
                 }
                 break;
             case SHOOT:
-                _LATB7 = 1;
+                _LATB7 = 1; // shoting motors
                 break;
         }
     }
