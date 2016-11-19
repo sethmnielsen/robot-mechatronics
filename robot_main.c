@@ -47,32 +47,21 @@ int main(void) {
                 }
                 break;
             case REVERSE:
-                // T2CNT = 0;
-                //Drive until Button Interrupt
-                // _LATB12 = 0;
-                // _LATB13 = 0;
+                stopped = 0;
+                _LATB7 = 0;
+                _LATB4 = 1; // buttons_out is high
 
-                // _LATB4 = 1; // buttons_out is high
-
-                // CHANGE IFs TO BE IF _RA4 IS LOW OR HIGH
-                if (steps < 900) {
-                    _LATB12 = 0;
-                    _LATB13 = 0;
-                    OC1R = 0.5*OC1RS;
-                }
-                else if (steps >= 900) {
-                    OC1R = 0;
-                    _LATB4 = 0;
-                    TMR3 = 0;           // left-right paddling
-                    angle_pad = 90;
-                    pad_count = 0;
-                    state = COLLECT;
-                }
+                _LATB12 = 0;
+                _LATB13 = 0;
+                OC1R = 0.5*OC1RS;
                 break;
             case COLLECT:
+                _LATB4 = 0; // buttons_out
+                OC1R = 0;
                 break;
             case FORWARD:
             // 805
+                stopped = 0;
                 if (steps < 805) {
                     _LATB12 = 1;
                     _LATB13 = 1;
@@ -82,21 +71,24 @@ int main(void) {
                     state = AIM;
                     TMR4 = 0;
                     OC1R = 0;
+                    stopped = 1;
                     steps = 0;
                 }
                 break;
             case AIM:
+                _LATB7 = 0;
                 if (steps < 805) {
                     _LATB12 = 1;
                     _LATB13 = 1;
                 }
                 else if (steps >= 805) {
                     OC1R = 0;
+                    stopped = 1;
                     steps = 0;
                 }
                 break;
             case SHOOT:
-                // OC1R = 0;
+                _LATB7 = 1;
                 break;
         }
     }
