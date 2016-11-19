@@ -27,6 +27,7 @@ int angle_pad = 0;   // angle of 'paddle' servo (ball collection)
 int angle_tur = 0;   // angle of turret servo
 int pad_count = 0;   // swipes of paddle servo
 int has_aimed = 0;   // if aimed while in forward state, shot right away
+int time3 = 0;
 
 //Configs
 void OC_config(void);       //Configure PWM for driving motors
@@ -99,7 +100,7 @@ void T1_config (void) {
 
     PR1 = 15625;              //Set Period for 1 s
     TMR1 = 0;                 //Start at t=0
-    _T1IP = 7;                //Int pri (7 is highest)
+    _T1IP = 2;                //Int pri (7 is highest)
     _T1IE = 1;                //Enable the timer
     _T1IF = 0;                //Clear the flag
 }
@@ -111,7 +112,8 @@ void T2_config (void) {
     T2CONbits.TCKPS = 0b11;   // prescale 1:256
 
     PR2 = 14999;    //Set period for shoting 6 balls
-    TMR2 = T2CNT;   //Start at t=0
+    // TMR2 = T2CNT;   //Start at t=0
+    TMR2 = 0;
     _T2IP = 5;      //Int Pri
     _T2IE = 1;      //Enable the timer
     _T2IF = 0;      //Clear the flag
@@ -124,11 +126,11 @@ void T3_config (void) {
 
     //Configure Timer1 interrupt
     TMR3 = 0;
-    _T3IP = 2; //Int Pri
+    _T3IP = 7; //Int Pri
     _T3IE = 1; //Int Pri enabled
     _T3IF = 0; //clear Flag
 
-    PR3 = 13000;
+    PR3 = 10000;
 }
 
 void T4_config (void) {
@@ -174,7 +176,7 @@ void comp_config (void) {
     //configure voltage reference
     _CVROE = 0;     // Voltage reference output is internal only
     _CVRSS = 0;     // Vdd and Vss as reference voltages
-    _CVR = 0x10;    // set Vref at 29/32*(Vdd-Vss) = 2.99 V (0x1D == 29)
+    _CVR = 0x14;    // set Vref at 20/32*(Vdd-Vss) = 2.06 V (0x14 == 20)
     _CVREN = 1;     // enable the module
 
     //configure comparator
@@ -208,7 +210,7 @@ void comp_config (void) {
     CM3CONbits.CEVT = 0;
     _CMIF = 0;
     _CMIE = 1;
-    _CMIP = 5;
+    _CMIP = 4;
 }
 
 void pins_config (void) {
@@ -240,32 +242,31 @@ void pins_config (void) {
 
 void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void) {
     _T1IF = 0;        //Reset timer
+
     if (T1CNT >= 120) {
         state = OFF;
-        _LATB7 = 1;
     }
     T1CNT += 1;
 }
 
 void __attribute__((interrupt, no_auto_psv)) _T2Interrupt (void) {
     _T2IF = 0;            // Reset timer
-     if (state == SHOOT) {
-         T2CNT = 0;
-        // _LATB7 = 0;       // turn DC motors off
+    if (state == SHOOT) {
+        T2CNT = 0;
+        // turn DC motors off
+        steps = 0;
         state = REVERSE;
-     }
+    }
 }
 
 void __attribute__((interrupt, no_auto_psv)) _T3Interrupt (void) {
     _T3IF = 0;        //Reset timer
-
+    _LATB7 = 1;
     if (state == COLLECT && pad_count >= 6) {
-        _T3IE = 0;
         OC3R = 0.06*OC3RS;
         angle_pad = 90;
         steps = 0;
         pad_count = 0;
-        _LATB7 = 0;
         state = FORWARD;
     }
     else if (state == COLLECT && angle_pad == 180) {
@@ -282,6 +283,7 @@ void __attribute__((interrupt, no_auto_psv)) _T3Interrupt (void) {
 
 void __attribute__((interrupt, no_auto_psv)) _T4Interrupt (void) {
     _T4IF = 0;        //Reset timer
+
     if (state == AIM) {
         has_aimed = 1;
     }
@@ -293,7 +295,7 @@ void __attribute__((interrupt, no_auto_psv)) _T5Interrupt (void) {
 
     if (state == AIM && has_aimed == 1) {
         has_aimed = 0;
-        T2_config();
+        TMR2 = 0;
         state = SHOOT;
     }
 }
@@ -314,12 +316,10 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
 
     //if LED changes while shoting
     if (state == SHOOT) {
-        T2CNT = TMR2;
+        // T2CNT = TMR2;
         state = AIM;
-        TMR4 = 0;
     }
     else if (state == FORWARD) {
-        TMR4 = 0;
         state = AIM;
     }
 
@@ -363,74 +363,6 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
     _OC1IF = 0;       //Clear interrupt flag
 
     steps += 1;
-
-    switch (state) {
-        case START:
-            //Keep rotating until finds beam
-            _LATB12 = 1;
-            _LATB13 = 0;
-            break;
-        case ROTATE:
-            //180 deg = 350
-            if (steps < 300) {
-                _LATB12 = 0;
-                _LATB13 = 1;
-            }
-            else if (steps >= 300) {
-                steps = 0;
-                state = REVERSE;
-            }
-            break;
-        case REVERSE:
-            //Drive until Button Interrupt
-            // _LATB12 = 0;
-            // _LATB13 = 0;
-
-            // _LATB4 = 1; // buttons_out is high
-
-            // CHANGE IFs TO BE IF _RA4 IS LOW OR HIGH
-            if (steps < 900) {
-                _LATB12 = 0;
-                _LATB13 = 0;
-                OC1R = 0.5*OC1RS;
-            }
-            else if (steps >= 900) {
-                OC1R = 0;
-                steps = 0;
-                _LATB4 = 0;
-                TMR3 = 0;            // left-right paddling
-                TMR4 = 0;            // count time to collect 6 balls
-                OC3R = 0.06*OC3RS;   // begin paddling servo at 90 deg
-                angle_pad = 90;
-                _LATB7 = 1;
-                state = COLLECT;
-            }
-            break;
-        case FORWARD:
-            if (steps < 805) {
-                _LATB12 = 1;
-                _LATB13 = 1;
-                OC1R = 0.5*OC1RS;
-            }
-            else if (steps >= 805) {
-                state = AIM;
-                TMR4 = 0;
-                OC1R = 0;
-                steps = 0;
-            }
-            break;
-        case AIM:
-            if (steps < 805) {
-                _LATB12 = 1;
-                _LATB13 = 1;
-            }
-            else if (steps >= 805) {
-                OC1R = 0;
-                steps = 0;
-            }
-       default:
-           break;
-   }
 }
 
 #endif
