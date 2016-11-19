@@ -19,7 +19,7 @@ int main(void) {
     CN_config();
     comp_config();
     pins_config();
-    
+
     state = START;
 
     while (1)
@@ -30,26 +30,24 @@ int main(void) {
                 return 0;
                 break;
             case START:
-                OC1R = OC1RS*0.5; // steppers
                 break;
             case ROTATE:
                 break;
             case REVERSE:
-                OC1R = OC1RS*0.5;
-                OC2R = OC2RS * 0.078;
+                // T2CNT = 0;
+                // OC1R = OC1RS*0.5;
+                // OC2R = OC2RS * 0.078;
                 break;
             case COLLECT:
-                OC1R = 0;
+                // OC1R = 0;
                 break;
             case FORWARD:
-                OC1R = 0.5*OC1RS;
+                // OC1R = 0.5*OC1RS;
                 break;
             case AIM:
-                OC1R = 0; // steppers off
                 break;
             case SHOOT:
-                _LATB7 = 1;
-                T2_config();
+                // OC1R = 0;
                 break;
         }
     }
