@@ -1,9 +1,6 @@
-/*
- * File:   robot_main.c
- * Authors: Aaron Bame, Carson Zaugg, Seth Nielsen, Derek Sanchez
- *
- * Created on November 4, 2016, 3:10 PM
- */
+// File: robot_main.c
+// Authors: Seth Nielsen, Aaron Bame, Derek Sanchez, Carson Zaugg
+// Created on November 4, 2016, 3:10 PM
 
 #include "robot_config.h"
 #include "xc.h"
@@ -95,8 +92,5 @@ int main(void) {
                 break;
         }
     }
-
-
-
     return 0;
 }

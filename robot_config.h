@@ -1,8 +1,6 @@
-/*
- * File:   Robot Registry Configuration
- * Authors: Aaron Bame, Carson Zaugg, Seth Nielsen, Derek Sanchez
- */
-
+// File: robot_config.h
+// Authors:  Seth Nielsen, Aaron Bame, Derek Sanchez, Carson Zaugg
+// Created on November 4, 2016, 3:10 PM
 
 #ifndef ROBOT_CONFIG_H
 #define	ROBOT_CONFIG_H
@@ -28,15 +26,15 @@ int has_aimed = 0;   // if aimed while in forward state, shot right away
 int stopped = 0;     // stopped at center X
 
 //Configs
-void OC_config(void);       //Configure PWM for steppers and servos
+void pins_config (void);    //Inputs/Outputs
 void T1_config (void);      //Competition round
 void T2_config (void);      //Time for shooting 6 balls
 void T3_config (void);      //Paddle servo back and forth
 void T4_config (void);      //Turret servo moving to shoting position
 void T5_config (void);      //Check for has aimed, is stopped; start shooting
 void CN_config (void);      //Change Notification Interrupt - buttons
-void comp_config (void);    //Comparator Interrupt - Infra sensors
-void pins_config (void);    //Inputs/Outputs
+void OC_config(void);       //Configure PWM for steppers and servos
+void comp_config (void);    //Comparator Interrupt - IR sensors
 
 //Interrupt Actions
 void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void);
@@ -45,7 +43,8 @@ void __attribute__((interrupt, no_auto_psv)) _T3Interrupt (void);
 void __attribute__((interrupt, no_auto_psv)) _T4Interrupt (void);
 void __attribute__((interrupt, no_auto_psv)) _T5Interrupt (void);
 void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void);
-void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void);       //Interrupt for stepper counter
+void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void);       // stepper counter
+void __attribute__((interrupt, no_auto_psc)) _CompInterrupt (void);     // IR sensors
 
 
 
@@ -54,46 +53,25 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void);       //Interr
 
 /********************************************** CONFIGURATIONS ************************************************/
 
-void OC_config(void) {
-    //Stepper PWM configuration (Pin 14)
-    _OC1IP = 6; //OC1 Int Priority
-    _OC1IE = 1; //OC1 Int Pri enabled
-    _OC1IF = 0; //OC1 clear Int Flag
-    OC1CON1bits.OCTSEL = 0b111;     //Set OC (output compare) to system clock (111)
-    OC1CON2bits.SYNCSEL = 0x1F;     //Source Selection: This output compare module
-    OC1CON2bits.OCTRIG = 0;         //Synchronizes OCx with source designated by the SYNCSELx bits
-    OC1CON1bits.OCM = 0b110;        //Edge aligned PWM mode
+void pins_config (void) {
+    //outputs
+    _TRISA1 = 0;
+    _TRISB4 = 0;
+    _TRISB7 = 0;
+    _TRISB12 = 0;
+    _TRISB13 = 0;
+    _TRISB14 = 0;
 
-    OC1RS = 18000;                  //Period
-    OC1R = 0.5*OC1RS;               //Duty Cycle
+    //inputs
+    _TRISA0 = 1;
+    _TRISA2 = 1;
+    _TRISA3 = 1;
+    _TRISA4 = 1;
 
-    //Turret (Pin 4)
-    OC2CON1bits.OCTSEL = 0b100;     //Set OC to Timer 1 (100)
-    OC2CON2bits.SYNCSEL = 0x1F;
-    OC2CON2bits.OCTRIG = 0;
-    OC2CON1bits.OCM = 0b110;
-
-    OC2RS = 313;
-    OC2R = 0.075*OC2RS;
-    angle_tur = 90;
-    // 0.03 = 0 deg (left)
-    // 0.075 = 90 deg (front)
-    // 0.13  = 180 deg (right)
-
-    //Paddle servo PWM (Pin 5)
-    OC3CON1bits.OCTSEL = 0b100;     //Set OC to Timer 1 (100)
-    OC3CON2bits.SYNCSEL = 0x1F;
-    OC3CON2bits.OCTRIG = 0;
-    OC3CON1bits.OCM = 0b110;
-
-    OC3RS = 313;
-    OC3R = 0.06*OC3RS;
-    angle_pad = 90;
-    // 0.06 = 90 deg
-    // 0.11 = 180 deg
+    // stepper _SLEEP
+    _LATB14 = 1;
 }
 
-//
 void T1_config (void) {
     T1CONbits.TON = 1;
     T1CONbits.TCS = 0;
@@ -160,6 +138,45 @@ void CN_config (void) {
     _CNIE = 1;   // Enable CN interrupts (IEC1 register)
 }
 
+void OC_config(void) {
+    //Stepper PWM configuration (Pin 14)
+    _OC1IP = 6; //OC1 Int Priority
+    _OC1IE = 1; //OC1 Int Pri enabled
+    _OC1IF = 0; //OC1 clear Int Flag
+    OC1CON1bits.OCTSEL = 0b111;     //Set OC (output compare) to system clock (111)
+    OC1CON2bits.SYNCSEL = 0x1F;     //Source Selection: This output compare module
+    OC1CON2bits.OCTRIG = 0;         //Synchronizes OCx with source designated by the SYNCSELx bits
+    OC1CON1bits.OCM = 0b110;        //Edge aligned PWM mode
+
+    OC1RS = 18000;                  //Period
+    OC1R = 0.5*OC1RS;               //Duty Cycle
+
+    //Turret (Pin 4)
+    OC2CON1bits.OCTSEL = 0b100;     //Set OC to Timer 1 (100)
+    OC2CON2bits.SYNCSEL = 0x1F;
+    OC2CON2bits.OCTRIG = 0;
+    OC2CON1bits.OCM = 0b110;
+
+    OC2RS = 313;
+    OC2R = 0.075*OC2RS;
+    angle_tur = 90;
+    // 0.03 = 0 deg (left)
+    // 0.075 = 90 deg (front)
+    // 0.13  = 180 deg (right)
+
+    //Paddle servo PWM (Pin 5)
+    OC3CON1bits.OCTSEL = 0b100;     //Set OC to Timer 1 (100)
+    OC3CON2bits.SYNCSEL = 0x1F;
+    OC3CON2bits.OCTRIG = 0;
+    OC3CON1bits.OCM = 0b110;
+
+    OC3RS = 313;
+    OC3R = 0.06*OC3RS;
+    angle_pad = 90;
+    // 0.06 = 90 deg (bent)
+    // 0.11 = 180 deg (pointing to corner)
+}
+
 void comp_config (void) {
     //configure voltage reference
     _CVROE = 0;     // Voltage reference output is internal only
@@ -201,25 +218,6 @@ void comp_config (void) {
     _CMIP = 4;
 }
 
-void pins_config (void) {
-    //outputs
-    _TRISA1 = 0;
-    _TRISB4 = 0;
-    _TRISB7 = 0;
-    _TRISB12 = 0;
-    _TRISB13 = 0;
-    _TRISB14 = 0;
-
-    //inputs
-    _TRISA0 = 1;
-    _TRISA2 = 1;
-    _TRISA3 = 1;
-    _TRISA4 = 1;
-
-    // stepper _SLEEP
-    _LATB14 = 1;
-}
-
 
 
 
@@ -252,22 +250,24 @@ void __attribute__((interrupt, no_auto_psv)) _T2Interrupt (void) {
 //Paddle servo back and forth
 void __attribute__((interrupt, no_auto_psv)) _T3Interrupt (void) {
     _T3IF = 0;
-    if (state == COLLECT && pad_count >= 6) {
-        OC3R = 0.06*OC3RS;
-        angle_pad = 90;
-        steps = 0;
-        pad_count = 0;
-        state = FORWARD;
-    }
-    else if (state == COLLECT && angle_pad == 180) {
-        OC3R = 0.06*OC3RS;
-        angle_pad = 90;
-        pad_count += 1;
-    }
-    else if (state == COLLECT && angle_pad == 90) {
-        OC3R = 0.11*OC3RS;
-        angle_pad = 180;
-        pad_count += 1;
+    if (state == COLLECT) {
+        if (pad_count >= 6) {
+            OC3R = 0.06*OC3RS;
+            angle_pad = 90;
+            steps = 0;
+            pad_count = 0;
+            state = FORWARD;
+        }
+        else if (angle_pad == 180) {
+            OC3R = 0.06*OC3RS;
+            angle_pad = 90;
+            pad_count += 1;
+        }
+        else if (angle_pad == 90) {
+            OC3R = 0.11*OC3RS;
+            angle_pad = 180;
+            pad_count += 1;
+        }
     }
 }
 
@@ -304,58 +304,58 @@ void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void) {
     }
 }
 
-// IR sensors low to high
-void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
-    _CMIF = 0;
-
-    TMR4 = 0;
-    //if LED changes while shoting
-    if (state == SHOOT) {
-        state = AIM;
-    }
-    else if (state == FORWARD) {
-        state = AIM;
-    }
-
-    //FLED
-    if (CM1CONbits.CEVT == 1 && (state == FORWARD || state == AIM || state == SHOOT || state == START)) {
-        angle_tur = 90;
-        OC2R = 0.075 * OC2RS;
-        if (state == START) {
-            steps = 0;
-            state = ROTATE;
-            return;
-        }
-    }
-    //RLED
-    else if (CM2CONbits.CEVT == 1 && (state == FORWARD || state == AIM || state == SHOOT)) {
-        angle_tur = 180;
-        OC2R = 0.12 * OC2RS;
-        // for long turns
-        if (angle_tur == 0) {
-            PR4 = 14000;
-        }
-    }
-    //LLED
-    else if (CM3CONbits.CEVT == 1 && (state == FORWARD || state == AIM || state == SHOOT)) {
-        angle_tur = 0;
-        OC2R = 0.03 * OC2RS;
-        // for long turns
-        if (angle_tur == 180 ) {
-            PR4 = 14000;
-        }
-    }
-
-    CM1CONbits.CEVT = 0; // clear event bits
-    CM2CONbits.CEVT = 0;
-    CM3CONbits.CEVT = 0;
-}
-
 // steppers counter
 void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
     _OC1IF = 0;
 
     steps += 1;
+}
+
+// IR sensors low to high
+void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
+    _CMIF = 0;
+
+    TMR4 = 0;
+
+    if (state == START && CM1CONbits.CEVT == 1) {
+        steps = 0;
+        state = ROTATE;
+        return;
+    }
+
+    //if LED changes while shoting
+    if (state == SHOOT || state == FORWARD) {
+        state = AIM;
+    }
+
+    if (state == AIM) {
+        //FLED
+        if (CM1CONbits.CEVT == 1) {
+            angle_tur = 90;
+            OC2R = 0.075 * OC2RS;
+        }
+        //RLED
+        else if (CM2CONbits.CEVT == 1) {
+            angle_tur = 180;
+            OC2R = 0.12 * OC2RS;
+            // for long turns
+            if (angle_tur == 0) {
+                PR4 = 14000;
+            }
+        }
+        //LLED
+        else if (CM3CONbits.CEVT == 1) {
+            angle_tur = 0;
+            OC2R = 0.03 * OC2RS;
+            // for long turns
+            if (angle_tur == 180 ) {
+                PR4 = 14000;
+            }
+        }
+    }
+    CM1CONbits.CEVT = 0; // clear event bits
+    CM2CONbits.CEVT = 0;
+    CM3CONbits.CEVT = 0;
 }
 
 #endif
