@@ -69,8 +69,15 @@ int main(void) {
                 else if (steps >= 90 && steps < 750) {
                     OC1RS = 15000;
                 }
-                else if (steps >= 750) {
+                else if (steps >= 750 && steps < 805) {
                     OC1RS = 20000;
+                }
+                else if (steps >= 805) {
+                    _LATB4 = 0;
+                    TMR3 = 0;
+                    angle_pad = 0;
+                    pad_count = 0;
+                    state = COLLECT;
                 }
                 OC1R = 0.5*OC1RS;
                 break;
@@ -85,7 +92,7 @@ int main(void) {
                 _LATB8 = 1; // connect release
                 // _LATB7 = 1; // shooting motors
                 stopped = 0;
-                if (steps < 715) {
+                if (steps < 805) {
                     if (steps < 30) {
                         OC1RS = 40000;
                     }
@@ -95,8 +102,17 @@ int main(void) {
                     else if (steps >= 60 && steps < 90) {
                         OC1RS = 20000;
                     }
-                    else {
+                    else if (steps >= 90 && steps < 715) {
                         OC1RS = 15000;
+                    }
+                    else if (steps >= 715 && steps < 745) {
+                        OC1RS = 20000;
+                    }
+                    else if (steps >= 745 && steps < 775) {
+                        OC1RS = 30000;
+                    }
+                    else {
+                        OC1RS = 40000;
                     }
                     _LATB12 = 1;
                     _LATB13 = 1;
@@ -114,6 +130,15 @@ int main(void) {
                 // Rotate turret to face active goal (either stopped or driving forward)
                 if (steps < 805) {
                     // keep driving if not yet at center
+                    if (steps >= 715 && steps < 745) {
+                        OC1RS = 20000;
+                    }
+                    else if (steps >= 745 && steps < 775) {
+                        OC1RS = 30000;
+                    }
+                    else if (steps >= 775) {
+                        OC1RS = 40000;
+                    }
                     _LATB12 = 1;
                     _LATB13 = 1;
                 }
