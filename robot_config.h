@@ -58,7 +58,7 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt (void);     // IR se
 void pins_config (void) {
     //outputs
     _TRISB4 = 0;    // buttons out
-    _TRISB7 = 0;    // DC motors switch
+    // _TRISB7 = 0;    // DC motors switch
     _TRISB8 = 0;    // Relsease servo switch
     _TRISB12 = 0;   // Steppers D2
     _TRISB13 = 0;   // Steppers D1
@@ -340,7 +340,6 @@ void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void) {
 // steppers counter
 void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
     _OC1IF = 0;
-
     steps += 1;
 }
 
