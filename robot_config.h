@@ -17,12 +17,12 @@
 enum action {OFF, START, ROTATE, REVERSE, COLLECT, FORWARD, AIM, SHOOT} state;
 
 int T1CNT = 0;       // count number of seconds from TMR1
-int T2CNT = 0;       // save count of TMR2 for returning to shot
+int T2CNT = 0;       // save count of TMR2 for returning to shoot
 int steps = 0;
 int angle_pad = 0;   // angle of 'paddle' servo (ball collection)
 int angle_tur = 0;   // angle of turret servo
 int pad_count = 0;   // swipes of paddle servo
-int has_aimed = 0;   // if aimed while in forward state, shot right away
+int has_aimed = 0;   // if aimed while in forward state, shoot right away
 int stopped = 0;     // stopped at center X
 
 //Configs
@@ -30,9 +30,10 @@ void pins_config (void);    //Inputs/Outputs
 void T1_config (void);      //Competition round
 void T2_config (void);      //Time for shooting 6 balls
 void T3_config (void);      //Paddle servo back and forth
-void T4_config (void);      //Turret servo moving to shoting position
+void T4_config (void);      //Turret servo moving to shooting position
 void T5_config (void);      //Check for has aimed, is stopped; start shooting
 void CN_config (void);      //Change Notification Interrupt - buttons
+void ad_config (void);
 void OC_config(void);       //Configure PWM for steppers and servos
 void comp_config (void);    //Comparator Interrupt - IR sensors
 
@@ -44,7 +45,8 @@ void __attribute__((interrupt, no_auto_psv)) _T4Interrupt (void);
 void __attribute__((interrupt, no_auto_psv)) _T5Interrupt (void);
 void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void);
 void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void);       // stepper counter
-void __attribute__((interrupt, no_auto_psc)) _CompInterrupt (void);     // IR sensors
+
+void __attribute__((interrupt, no_auto_psv)) _CompInterrupt (void);     // IR sensors
 
 
 
@@ -55,21 +57,24 @@ void __attribute__((interrupt, no_auto_psc)) _CompInterrupt (void);     // IR se
 
 void pins_config (void) {
     //outputs
-    _TRISA1 = 0;
-    _TRISB4 = 0;
-    _TRISB7 = 0;
-    _TRISB12 = 0;
-    _TRISB13 = 0;
-    _TRISB14 = 0;
+    _TRISB4 = 0;    // buttons out
+    _TRISB7 = 0;    // DC motors switch
+    _TRISB8 = 0;    // Relsease servo switch
+    _TRISB12 = 0;   // Steppers D2
+    _TRISB13 = 0;   // Steppers D1
+    _TRISB14 = 0;   // Steppers _SLEEP
 
     //inputs
-    _TRISA0 = 1;
-    _TRISA2 = 1;
-    _TRISA3 = 1;
-    _TRISA4 = 1;
+    _TRISA0 = 1;    // LLED
+    _TRISA2 = 1;    // FLED
+    _TRISA3 = 1;    // RLED
+    _TRISA4 = 1;    // buttons in
 
-    // stepper _SLEEP
-    _LATB14 = 1;
+    // AD input
+    _ANSB2 = 1;     // FLED2
+
+    _LATB14 = 1;    // _SLEEP
+    _LATB8 = 1;     // connect release
 }
 
 void T1_config (void) {
@@ -80,7 +85,7 @@ void T1_config (void) {
     _T1IP = 7;              // Select interrupt priority (7 is highest)
     _T1IE = 1;              // Enable interrupt
     _T1IF = 0;              // Clear interrupt flag
-    PR1 = 15625;            // Set period for interrupt to occur (1.0 sec)
+    PR1 = 15000;            // Set period for interrupt to occur (1.0 sec)
 }
 
 void T2_config (void) {
@@ -103,7 +108,7 @@ void T3_config (void) {
     _T3IP = 4;
     _T3IE = 1;
     _T3IF = 0;
-    PR3 = 10000; // 0.64 sec
+    PR3 = 9000; // 0.576 sec
 }
 
 void T4_config (void) {
@@ -126,16 +131,44 @@ void T5_config (void) {
     _T5IP = 4;
     _T5IE = 1;
     _T5IF = 0;
-    PR5 = 1001; // 0.064 sec (15.6 Hz)
+    PR5 = 1001; // 0.0274 sec (15.6 Hz)
 }
 
 void CN_config (void) {
     _CN0IE = 1;  // Enable CN on pin 10 (LLED)
 
-    _CN5PUE = 0; // Disable pull-up resistor (CNPU1 register)
-    _CNIP = 5;   // Set CN interrupt priority (IPC4 register)
-    _CNIF = 0;   // Clear interrupt flag (IFS1 register)
-    _CNIE = 1;   // Enable CN interrupts (IEC1 register)
+    _CN5PUE = 0;
+    _CNIP = 5;
+    _CNIF = 0;
+    _CNIE = 1;
+}
+
+void ad_config (void) {
+    _ADON = 0;
+
+    // AD1CON1 register
+    _ADSIDL = 0;
+    _MODE12 = 1;
+    _FORM = 0;
+    _SSRC = 7;
+    _ASAM = 1;
+
+    // AD1CON2 register
+    _PVCFG = 0;
+    _NVCFG = 0;
+    _BUFREGEN = 1;
+    _CSCNA = 1;
+    _SMPI = 2;
+    _ALTS = 0;
+
+    // AD1CON3 register
+    _ADRC = 0;
+    _SAMC = 1;
+    _ADCS = 0x3F;
+
+    //AD1CSS registers
+    _CSS4 = 1;    //Pin 6 (Photodiode)
+    _ADON = 1;    //Turn on A/D
 }
 
 void OC_config(void) {
@@ -148,7 +181,7 @@ void OC_config(void) {
     OC1CON2bits.OCTRIG = 0;         //Synchronizes OCx with source designated by the SYNCSELx bits
     OC1CON1bits.OCM = 0b110;        //Edge aligned PWM mode
 
-    OC1RS = 18000;                  //Period
+    OC1RS = 20000;                  //Period
     OC1R = 0.5*OC1RS;               //Duty Cycle
 
     //Turret (Pin 4)
@@ -164,17 +197,17 @@ void OC_config(void) {
     // 0.075 = 90 deg (front)
     // 0.13  = 180 deg (right)
 
-    //Paddle servo PWM (Pin 5)
+    //Paddle + Release servos PWM (Pin 5)
     OC3CON1bits.OCTSEL = 0b100;     //Set OC to Timer 1 (100)
     OC3CON2bits.SYNCSEL = 0x1F;
     OC3CON2bits.OCTRIG = 0;
     OC3CON1bits.OCM = 0b110;
 
     OC3RS = 313;
-    OC3R = 0.06*OC3RS;
-    angle_pad = 90;
-    // 0.06 = 90 deg (bent)
-    // 0.11 = 180 deg (pointing to corner)
+    OC3R = 0.027*OC3RS;
+    angle_pad = 0;
+    // 0.027 = 0 deg (paddle in, release closed)
+    // 0.06 = 45 deg (paddle out, release opened)
 }
 
 void comp_config (void) {
@@ -252,26 +285,26 @@ void __attribute__((interrupt, no_auto_psv)) _T3Interrupt (void) {
     _T3IF = 0;
     if (state == COLLECT) {
         if (pad_count >= 6) {
-            OC3R = 0.06*OC3RS;
-            angle_pad = 90;
+            OC3R = 0.027*OC3RS;
+            angle_pad = 0;
             steps = 0;
             pad_count = 0;
             state = FORWARD;
         }
-        else if (angle_pad == 180) {
-            OC3R = 0.06*OC3RS;
-            angle_pad = 90;
+        else if (angle_pad == 45) {
+            OC3R = 0.027*OC3RS;
+            angle_pad = 0;
             pad_count += 1;
         }
-        else if (angle_pad == 90) {
-            OC3R = 0.11*OC3RS;
-            angle_pad = 180;
+        else if (angle_pad == 0) {
+            OC3R = 0.06*OC3RS;
+            angle_pad = 45;
             pad_count += 1;
         }
     }
 }
 
-//Turret servo moving to shoting position
+//Turret servo moving to shooting position
 void __attribute__((interrupt, no_auto_psv)) _T4Interrupt (void) {
     _T4IF = 0;
 
@@ -298,7 +331,7 @@ void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void) {
     if (_RA4 == 1 && state == REVERSE) {
         _LATB4 = 0;
         TMR3 = 0;
-        angle_pad = 90;
+        angle_pad = 0;
         pad_count = 0;
         state = COLLECT;
     }
@@ -318,12 +351,13 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
     TMR4 = 0;
 
     if (state == START && CM1CONbits.CEVT == 1) {
+        while ((ADC1BUF4/4095.0) < 0.5) {};
         steps = 0;
         state = ROTATE;
         return;
     }
 
-    //if LED changes while shoting
+    //if LED changes while shooting
     if (state == SHOOT || state == FORWARD) {
         state = AIM;
     }

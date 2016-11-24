@@ -15,6 +15,7 @@ int main(void) {
     T4_config();
     T5_config();
     CN_config();
+    ad_config();
     comp_config();
     pins_config();
 
@@ -34,11 +35,11 @@ int main(void) {
             case ROTATE:
                 // Rotate opposite direction to face corner
                 //180 deg = 350
-                if (steps < 300) {
+                if (steps < 340) {
                     _LATB12 = 0;
                     _LATB13 = 1;
                 }
-                else if (steps >= 300) {
+                else if (steps >= 340) {
                     steps = 0;
                     state = REVERSE;
                 }
@@ -46,7 +47,8 @@ int main(void) {
             case REVERSE:
                 // Drive towards corner until buttons pressed
                 stopped = 0;
-                _LATB7 = 0;  // shoting motors
+                OC3R = 0.028*OC3RS; // close release
+                _LATB7 = 0;  // shooting motors off
                 _LATB4 = 1;  // buttons_out
                 _LATB12 = 0; // steppers
                 _LATB13 = 0;
@@ -55,10 +57,13 @@ int main(void) {
             case COLLECT:
                 // Swipe paddle to collect 6 balls
                 _LATB4 = 0; // buttons_out
+                _LATB8 = 0;  // release disconnected
                 OC1R = 0;   // steppers
                 break;
             case FORWARD:
                 // Drive to center, aim for active goal
+                _LATB8 = 1; // connect release
+                _LATB7 = 1; // shooting motors
                 stopped = 0;
                 if (steps < 805) {
                     _LATB12 = 1;
@@ -75,7 +80,6 @@ int main(void) {
                 break;
             case AIM:
                 // Rotate turret to face active goal (either stopped or driving forward)
-                _LATB7 = 0; // shoting motors
                 if (steps < 805) {
                     // keep driving if not yet at center
                     _LATB12 = 1;
@@ -88,7 +92,7 @@ int main(void) {
                 }
                 break;
             case SHOOT:
-                _LATB7 = 1; // shoting motors
+                OC3R = 0.06*OC3RS;  // open release
                 break;
         }
     }
