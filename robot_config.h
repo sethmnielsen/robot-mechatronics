@@ -58,11 +58,13 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt (void);     // IR se
 void pins_config (void) {
     //outputs
     _TRISB4 = 0;    // buttons out
-    // _TRISB7 = 0;    // DC motors switch
+    _TRISB7 = 0;    // DC motors switch
     _TRISB8 = 0;    // Relsease servo switch
     _TRISB12 = 0;   // Steppers D2
     _TRISB13 = 0;   // Steppers D1
     _TRISB14 = 0;   // Steppers _SLEEP
+
+    _TRISA1 = 0;
 
     //inputs
     _TRISA0 = 1;    // LLED
@@ -131,7 +133,7 @@ void T5_config (void) {
     _T5IP = 4;
     _T5IE = 1;
     _T5IF = 0;
-    PR5 = 1001; // 0.0274 sec (15.6 Hz)
+    PR5 = 1001; // 0.0254 sec (15.6 Hz)
 }
 
 void CN_config (void) {
@@ -195,7 +197,7 @@ void OC_config(void) {
     angle_tur = 90;
     // 0.03 = 0 deg (left)
     // 0.075 = 90 deg (front)
-    // 0.13  = 180 deg (right)
+    // 0.125  = 180 deg (right)
 
     //Paddle + Release servos PWM (Pin 5)
     OC3CON1bits.OCTSEL = 0b100;     //Set OC to Timer 1 (100)
@@ -204,9 +206,9 @@ void OC_config(void) {
     OC3CON1bits.OCM = 0b110;
 
     OC3RS = 313;
-    OC3R = 0.027*OC3RS;
+    OC3R = 0.025*OC3RS;
     angle_pad = 0;
-    // 0.027 = 0 deg (paddle in, release closed)
+    // 0.025 = 0 deg (paddle in, release closed)
     // 0.06 = 45 deg (paddle out, release opened)
 }
 
@@ -214,7 +216,7 @@ void comp_config (void) {
     //configure voltage reference
     _CVROE = 0;     // Voltage reference output is internal only
     _CVRSS = 0;     // Vdd and Vss as reference voltages
-    _CVR = 0x1B;    // set Vref at 8/32*(Vdd-Vss) = 2.8875 V (0x1B == 28)
+    _CVR = 0x1D;    // set Vref at 30/32*(Vdd-Vss) = 3.09 V (0x1D == 30)
     _CVREN = 1;     // enable the module
 
     //configure comparators
@@ -264,7 +266,7 @@ void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void) {
     _T1IF = 0;
 
     // 120 counts = 120 sec
-    if (T1CNT >= 120) {
+    if (T1CNT >= 12000) {
         state = OFF;
     }
     T1CNT += 1;
@@ -275,6 +277,7 @@ void __attribute__((interrupt, no_auto_psv)) _T2Interrupt (void) {
     _T2IF = 0;
     if (state == SHOOT) {
         steps = 0;
+        T2CNT = 0;
         OC2R = 0.075*OC2RS;
         state = REVERSE;
     }
@@ -285,14 +288,14 @@ void __attribute__((interrupt, no_auto_psv)) _T3Interrupt (void) {
     _T3IF = 0;
     if (state == COLLECT) {
         if (pad_count >= 6) {
-            OC3R = 0.027*OC3RS;
+            OC3R = 0.025*OC3RS;
             angle_pad = 0;
             steps = 0;
             pad_count = 0;
             state = FORWARD;
         }
         else if (angle_pad == 45) {
-            OC3R = 0.027*OC3RS;
+            OC3R = 0.025*OC3RS;
             angle_pad = 0;
             pad_count += 1;
         }
@@ -320,7 +323,7 @@ void __attribute__((interrupt, no_auto_psv)) _T5Interrupt (void) {
 
     if (stopped == 1 && has_aimed == 1) {
         has_aimed = 0;
-        TMR2 = 0;
+        TMR2 = T2CNT;
         state = SHOOT;
     }
 }
@@ -350,14 +353,18 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
     TMR4 = 0;
 
     if (state == START && CM1CONbits.CEVT == 1) {
-        while ((ADC1BUF4/4095.0) < 0.5) {};
+        while ((ADC1BUF4/4095.0) < 0.65) {};
         steps = 0;
         state = ROTATE;
         return;
     }
 
     //if LED changes while shooting
-    if (state == SHOOT || state == FORWARD) {
+    if (state == SHOOT) {
+        T2CNT = TMR2;
+        state = AIM;
+    }
+    else if (state == FORWARD) {
         state = AIM;
     }
 
@@ -370,7 +377,7 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
         //RLED
         else if (CM2CONbits.CEVT == 1) {
             angle_tur = 180;
-            OC2R = 0.12 * OC2RS;
+            OC2R = 0.125 * OC2RS;
             // for long turns
             if (angle_tur == 0) {
                 PR4 = 14000;
