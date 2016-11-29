@@ -17,6 +17,7 @@ void speedup(void) {
         OC1RS = 20000;
     }
     else if (steps >= 90 && steps < 715) {
+        _CMIE = 1;
         OC1RS = 20000;
     }
 }
@@ -81,8 +82,9 @@ int main(void) {
                 }
                 break;
             case REVERSE:
-            _LATA1 = 0;
+                _LATA1 = 0;
                 // Drive towards corner until buttons pressed
+                _CMIE = 0;
                 _LATB12 = 0; // steppers
                 _LATB13 = 0;
                 stopped = 0;
