@@ -10,6 +10,8 @@
 // Pins 8,9 and 10 are available
 #pragma config OSCIOFNC = OFF
 #pragma config SOSCSRC = DIG
+#pragma config FWDTEN = OFF
+
 
 #pragma config FNOSC = FRC // 8 MHz Oscillator
 
@@ -24,6 +26,8 @@ int angle_tur = 0;   // angle of turret servo
 int pad_count = 0;   // swipes of paddle servo
 int has_aimed = 0;   // if aimed while in forward state, shoot right away
 int stopped = 0;     // stopped at center X
+
+
 
 //Configs
 void pins_config (void);    //Inputs/Outputs
@@ -63,8 +67,6 @@ void pins_config (void) {
     _TRISB12 = 0;   // Steppers D2
     _TRISB13 = 0;   // Steppers D1
     _TRISB14 = 0;   // Steppers _SLEEP
-
-    _TRISA1 = 0;
 
     //inputs
     _TRISA0 = 1;    // LLED
@@ -183,8 +185,8 @@ void OC_config(void) {
     OC1CON2bits.OCTRIG = 0;         //Synchronizes OCx with source designated by the SYNCSELx bits
     OC1CON1bits.OCM = 0b110;        //Edge aligned PWM mode
 
-    OC1RS = 20000;                  //Period
-    OC1R = 0.5*OC1RS;               //Duty Cycle
+    OC1RS = 9000;                  //Period
+    OC1R = 0.9*OC1RS;             //Duty Cycle
 
     //Turret (Pin 4)
     OC2CON1bits.OCTSEL = 0b100;     //Set OC to Timer 1 (100)
@@ -197,7 +199,7 @@ void OC_config(void) {
     angle_tur = 90;
     // 0.03 = 0 deg (left)
     // 0.075 = 90 deg (front)
-    // 0.125  = 180 deg (right)
+    // 0.12  = 180 deg (right)
 
     //Paddle + Release servos PWM (Pin 5)
     OC3CON1bits.OCTSEL = 0b100;     //Set OC to Timer 1 (100)
@@ -216,7 +218,7 @@ void comp_config (void) {
     //configure voltage reference
     _CVROE = 0;     // Voltage reference output is internal only
     _CVRSS = 0;     // Vdd and Vss as reference voltages
-    _CVR = 0x1D;    // set Vref at 30/32*(Vdd-Vss) = 3.09 V (0x1D == 30)
+    _CVR = 0x1F;    // set Vref at 32/32*(Vdd-Vss) = 3.3 V (0x2 == 32)
     _CVREN = 1;     // enable the module
 
     //configure comparators
@@ -266,8 +268,8 @@ void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void) {
     _T1IF = 0;
 
     // 120 counts = 120 sec
-    if (T1CNT >= 12000) {
-        state = OFF;
+    if (T1CNT >= 120) {
+//        state = OFF;
     }
     T1CNT += 1;
 }
@@ -353,14 +355,23 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
     TMR4 = 0;
 
     if (state == START && CM1CONbits.CEVT == 1) {
-        while ((ADC1BUF4/4095.0) < 0.65) {};
-        steps = 0;
+        if (steps < 75) {
+            steps = -30;
+        }
+        else {
+            while ((ADC1BUF4/4095.0) < 0.65) {};
+            steps = 0;
+        }
         state = ROTATE;
         return;
     }
 
     //if LED changes while shooting
     if (state == SHOOT) {
+        // if ((CM1CONbits.CEVT == 1 && angle_tur == 90)  ||
+        //     (CM2CONbits.CEVT == 1 && angle_tur == 180) ||
+        //     (CM3CONbits.CEVT == 1 && angle_tur == 0)    )
+        //     { return; }
         T2CNT = TMR2;
         state = AIM;
     }
@@ -376,21 +387,19 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
         }
         //RLED
         else if (CM2CONbits.CEVT == 1) {
-            angle_tur = 180;
-            OC2R = 0.125 * OC2RS;
-            // for long turns
             if (angle_tur == 0) {
                 PR4 = 14000;
             }
+            angle_tur = 180;
+            OC2R = 0.12 * OC2RS;
         }
         //LLED
         else if (CM3CONbits.CEVT == 1) {
-            angle_tur = 0;
-            OC2R = 0.03 * OC2RS;
-            // for long turns
-            if (angle_tur == 180 ) {
+            if (angle_tur == 180) {
                 PR4 = 14000;
             }
+            angle_tur = 0;
+            OC2R = 0.03 * OC2RS;
         }
     }
     CM1CONbits.CEVT = 0; // clear event bits
