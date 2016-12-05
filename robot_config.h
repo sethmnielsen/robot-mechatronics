@@ -27,19 +27,25 @@ int pad_count = 0;   // swipes of paddle servo
 int has_aimed = 0;   // if aimed while in forward state, shoot right away
 int stopped = 0;     // stopped at center X
 
+    // Turret
+    const int left = 0.03;
+    const int front = 0.075;
+    const int right = 0.125;
+    // Paddle/Release
+    const int closed = 0.025;
+    const int open = 0.06;
 
 
 //Configs
-void pins_config (void);    //Inputs/Outputs
-void T1_config (void);      //Competition round
-void T2_config (void);      //Time for shooting 6 balls
-void T3_config (void);      //Paddle servo back and forth
-void T4_config (void);      //Turret servo moving to shooting position
-void T5_config (void);      //Check for has aimed, is stopped; start shooting
-void CN_config (void);      //Change Notification Interrupt - buttons
+void pins_config (void);    // Inputs/Outputs
+void T1_config (void);      // Competition round
+void T2_config (void);      // Time for shooting 6 balls
+void T3_config (void);      // Paddle servo back and forth
+void T4_config (void);      // Turret servo moving to shooting position
+void T5_config (void);      // Check for has aimed, is stopped; start shooting
+void CN_config (void);      // Change Notification Interrupt - buttons
 void ad_config (void);
-void OC_config(void);       //Configure PWM for steppers and servos
-void comp_config (void);    //Comparator Interrupt - IR sensors
+void comp_config (void);    // Comparator Interrupt - IR sensors
 
 //Interrupt Actions
 void __attribute__((interrupt, no_auto_psv)) _T1Interrupt (void);
@@ -186,7 +192,7 @@ void OC_config(void) {
     OC1CON1bits.OCM = 0b110;        //Edge aligned PWM mode
 
     OC1RS = 9000;                  //Period
-    OC1R = 0.9*OC1RS;             //Duty Cycle
+    OC1R = 0.9*OC1RS;              //Duty Cycle
 
     //Turret (Pin 4)
     OC2CON1bits.OCTSEL = 0b100;     //Set OC to Timer 1 (100)
@@ -195,11 +201,8 @@ void OC_config(void) {
     OC2CON1bits.OCM = 0b110;
 
     OC2RS = 313;
-    OC2R = 0.075*OC2RS;
     angle_tur = 90;
-    // 0.03 = 0 deg (left)
-    // 0.075 = 90 deg (front)
-    // 0.12  = 180 deg (right)
+    OC2R = front*OC2RS;
 
     //Paddle + Release servos PWM (Pin 5)
     OC3CON1bits.OCTSEL = 0b100;     //Set OC to Timer 1 (100)
@@ -208,10 +211,8 @@ void OC_config(void) {
     OC3CON1bits.OCM = 0b110;
 
     OC3RS = 313;
-    OC3R = 0.025*OC3RS;
+    OC3R = closed*OC3RS;
     angle_pad = 0;
-    // 0.025 = 0 deg (paddle in, release closed)
-    // 0.06 = 45 deg (paddle out, release opened)
 }
 
 void comp_config (void) {
@@ -280,7 +281,7 @@ void __attribute__((interrupt, no_auto_psv)) _T2Interrupt (void) {
     if (state == SHOOT) {
         steps = 0;
         T2CNT = 0;
-        OC2R = 0.075*OC2RS;
+        OC2R = front*OC2RS;
         state = REVERSE;
     }
 }
@@ -290,19 +291,19 @@ void __attribute__((interrupt, no_auto_psv)) _T3Interrupt (void) {
     _T3IF = 0;
     if (state == COLLECT) {
         if (pad_count >= 6) {
-            OC3R = 0.025*OC3RS;
+            OC3R = closed*OC3RS;
             angle_pad = 0;
             steps = 0;
             pad_count = 0;
             state = FORWARD;
         }
         else if (angle_pad == 45) {
-            OC3R = 0.025*OC3RS;
+            OC3R = closed*OC3RS;
             angle_pad = 0;
             pad_count += 1;
         }
         else if (angle_pad == 0) {
-            OC3R = 0.06*OC3RS;
+            OC3R = open*OC3RS;
             angle_pad = 45;
             pad_count += 1;
         }
@@ -359,19 +360,23 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
             steps = -30;
         }
         else {
-            while ((ADC1BUF4/4095.0) < 0.65) {};
+            while ((ADC1BUF4/4095.0) < 0.8) {};
             steps = 0;
         }
         state = ROTATE;
+        CM1CONbits.CEVT = 0; // clear event bits
         return;
     }
 
     //if LED changes while shooting
     if (state == SHOOT) {
-        // if ((CM1CONbits.CEVT == 1 && angle_tur == 90)  ||
-        //     (CM2CONbits.CEVT == 1 && angle_tur == 180) ||
-        //     (CM3CONbits.CEVT == 1 && angle_tur == 0)    )
-        //     { return; }
+        if ((CM1CONbits.CEVT == 1 && angle_tur == 90)  ||
+            (CM2CONbits.CEVT == 1 && angle_tur == 180) ||
+            (CM3CONbits.CEVT == 1 && angle_tur == 0)    )
+            {
+                CM1CONbits.CEVT = 0; // clear event bits
+                return;
+            }
         T2CNT = TMR2;
         state = AIM;
     }
@@ -383,7 +388,7 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
         //FLED
         if (CM1CONbits.CEVT == 1) {
             angle_tur = 90;
-            OC2R = 0.075 * OC2RS;
+            OC2R = front * OC2RS;
         }
         //RLED
         else if (CM2CONbits.CEVT == 1) {
@@ -391,7 +396,7 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
                 PR4 = 14000;
             }
             angle_tur = 180;
-            OC2R = 0.12 * OC2RS;
+            OC2R = right * OC2RS;
         }
         //LLED
         else if (CM3CONbits.CEVT == 1) {
@@ -399,7 +404,7 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
                 PR4 = 14000;
             }
             angle_tur = 0;
-            OC2R = 0.03 * OC2RS;
+            OC2R = left * OC2RS;
         }
     }
     CM1CONbits.CEVT = 0; // clear event bits
