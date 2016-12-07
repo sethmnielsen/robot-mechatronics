@@ -7,23 +7,32 @@
 #include <stdio.h>
 
 // Speeds (slowest to fastest):
-int v1 = 5000;
-int v2 = 5500;
-int v3 = 6000;
-int v4 = 7000;
-int v5 = 8000;
-int vrotate = 9000;
-int vrotate2 = 8000;
+// const int v1 = 2900;
+// const int v2 = 3300;
+// const int v3 = 4200;
+// const int v4 = 5000;
+// const int v5 = 6000;
 
-int dist = 3220;
-int turn = 1280;
+const int v1 = 4000;
+const int v2 = 4500;
+const int v3 = 5000;
+const int v4 = 6000;
+const int v5 = 7000;
+
+const int vturn = 6000; // rotation during START/ROTATE
+
+// Distances
+const int dist = 5300; // Dispenser to X center
+const int turn = 1900; // ~ 180 deg
+const int to_corner = 10000; // Finding dispenser in the beginning
+const int slow_dist = 5100;
 
 void speedup(void) {
     int a = 200;
     int b = 400;
     int c = 550;
     int d = 700;
-    int e = 2860;
+    int e = slow_dist;
 
     if (steps < a) {
         _CMIE = 0;
@@ -48,9 +57,9 @@ void speedup(void) {
 }
 
 void slowdown(void) {
-    int a = 2800;
-    int b = 2900;
-    int c = 3100;
+    int a = slow_dist;
+    int b = dist - 100;
+    int c = dist;
 
     if (steps >= a && steps < b) {
         OC1RS = v2;
@@ -64,6 +73,7 @@ void slowdown(void) {
 
 int main(void) {
 
+    pins_config();
     OC_config();
     T1_config();
     T2_config();
@@ -73,7 +83,6 @@ int main(void) {
     CN_config();
     ad_config();
     comp_config();
-    pins_config();
 
     state = START;
     while (1)
@@ -87,16 +96,15 @@ int main(void) {
                 // Keep rotating until finds beam
                 _LATB12 = 1;
                 _LATB13 = 0;
-                OC1RS = vrotate;
+                OC1RS = vturn;
                 // speedup();
                 break;
             case ROTATE:
                 // Rotate opposite direction to face corner
-                //180 deg = 1400
                 if (steps < turn) {
                     _LATB12 = 0;
                     _LATB13 = 1;
-                    OC1RS = vrotate2;
+                    OC1RS = vturn;
                 }
                 else if (steps >= turn) {
                     steps = 10000; // for initially finding corner
@@ -109,30 +117,30 @@ int main(void) {
                 _LATB12 = 0; // steppers
                 _LATB13 = 0;
                 stopped = 0;
-                OC3R = 0.025*OC3RS; // close release
+                OC3R = closed*OC3RS; // close release
                 _LATB7 = 0;  // shooting motors off
                 _LATB4 = 1;  // buttons out
-                if (steps < (dist+300)) {
+                if (steps < (dist+2000)) {
                     speedup();
                 }
-                else if (steps >= (dist+300) && steps < 10000) {
+                else if (steps >= (dist+2000) && steps < 10000) {
                     _LATB4 = 0;
                     TMR3 = 0;
                     angle_pad = 0;
                     pad_count = 0;
                     state = COLLECT;
                 }
-                else if (steps >= 10000 && steps < 13500) {
-                    OC1RS = v1;
+                else if (steps >= 10000 && steps < (25000)) {
+                    OC1RS = v3;
                 }
-                else if (steps >= 13500) {
+                else if (steps >= (25000)) {
                     _LATB4 = 0;
                     TMR3 = 0;
                     angle_pad = 0;
                     pad_count = 0;
                     state = COLLECT;
                 }
-                OC1R = 0.9*OC1RS;
+                OC1R = 0.5*OC1RS;
                 break;
             case COLLECT:
                 // Swipe paddle to collect 6 balls
@@ -150,7 +158,7 @@ int main(void) {
                     slowdown();
                     _LATB12 = 1;
                     _LATB13 = 1;
-                    OC1R = 0.9*OC1RS;
+                    OC1R = 0.5*OC1RS;
                 }
                 else if (steps >= dist) {
                     state = AIM;
@@ -163,7 +171,7 @@ int main(void) {
                 break;
             case AIM:
                 // Rotate turret to face active goal (either stopped or driving forward)
-                OC3R = 0.025*OC3RS; // close release
+                OC3R = closed*OC3RS; // close release
                 if (steps < dist) {
                     // keep driving if not yet at center
                     speedup();
@@ -178,7 +186,7 @@ int main(void) {
                 break;
             case SHOOT:
                 _CMIE = 1;
-                OC3R = 0.06*OC3RS;  // open release
+                OC3R = open*OC3RS;  // open release
                 break;
         }
     }

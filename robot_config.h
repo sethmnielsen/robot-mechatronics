@@ -28,12 +28,14 @@ int has_aimed = 0;   // if aimed while in forward state, shoot right away
 int stopped = 0;     // stopped at center X
 
     // Turret
-    const int left = 0.03;
-    const int front = 0.075;
-    const int right = 0.125;
+    // DUTY btw 0.112 and 0.015
+    // LOWER OR HIGHER WILL SCRATE EF UP
+    const float left = 0.109;
+    const float front = 0.063;
+    const float right = 0.02;
     // Paddle/Release
-    const int closed = 0.025;
-    const int open = 0.06;
+    const float closed = 0.0255;
+    const float open = 0.06;
 
 
 //Configs
@@ -45,6 +47,7 @@ void T4_config (void);      // Turret servo moving to shooting position
 void T5_config (void);      // Check for has aimed, is stopped; start shooting
 void CN_config (void);      // Change Notification Interrupt - buttons
 void ad_config (void);
+void OC_config(void);       // Configure PWM for steppers and servos
 void comp_config (void);    // Comparator Interrupt - IR sensors
 
 //Interrupt Actions
@@ -55,7 +58,6 @@ void __attribute__((interrupt, no_auto_psv)) _T4Interrupt (void);
 void __attribute__((interrupt, no_auto_psv)) _T5Interrupt (void);
 void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void);
 void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void);       // stepper counter
-
 void __attribute__((interrupt, no_auto_psv)) _CompInterrupt (void);     // IR sensors
 
 
@@ -95,7 +97,7 @@ void T1_config (void) {
     _T1IP = 7;              // Select interrupt priority (7 is highest)
     _T1IE = 1;              // Enable interrupt
     _T1IF = 0;              // Clear interrupt flag
-    PR1 = 15000;            // Set period for interrupt to occur (1.0 sec)
+    PR1 = 14658;            // Set period for interrupt to occur (1.0 sec)
 }
 
 void T2_config (void) {
@@ -118,7 +120,7 @@ void T3_config (void) {
     _T3IP = 4;
     _T3IE = 1;
     _T3IF = 0;
-    PR3 = 9000; // 0.576 sec
+    PR3 = 8000;
 }
 
 void T4_config (void) {
@@ -130,7 +132,7 @@ void T4_config (void) {
     _T4IP = 3;
     _T4IE = 1;
     _T4IF = 0;
-    PR4 = 7812; // 0.5 sec
+    PR4 = 8812; // 0.5 sec
 }
 
 void T5_config (void) {
@@ -192,7 +194,7 @@ void OC_config(void) {
     OC1CON1bits.OCM = 0b110;        //Edge aligned PWM mode
 
     OC1RS = 9000;                  //Period
-    OC1R = 0.9*OC1RS;              //Duty Cycle
+    OC1R = 0.5*OC1RS;              //Duty Cycle
 
     //Turret (Pin 4)
     OC2CON1bits.OCTSEL = 0b100;     //Set OC to Timer 1 (100)
@@ -219,7 +221,7 @@ void comp_config (void) {
     //configure voltage reference
     _CVROE = 0;     // Voltage reference output is internal only
     _CVRSS = 0;     // Vdd and Vss as reference voltages
-    _CVR = 0x1F;    // set Vref at 32/32*(Vdd-Vss) = 3.3 V (0x2 == 32)
+    _CVR = 0x1B;    // set Vref at 25/32*(Vdd-Vss) = 2.58 V (0x19 == 25)
     _CVREN = 1;     // enable the module
 
     //configure comparators
@@ -360,7 +362,7 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
             steps = -30;
         }
         else {
-            while ((ADC1BUF4/4095.0) < 0.8) {};
+            while ((ADC1BUF4/4095.0) < 0.6) {};
             steps = 0;
         }
         state = ROTATE;
@@ -388,7 +390,7 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
         //FLED
         if (CM1CONbits.CEVT == 1) {
             angle_tur = 90;
-            OC2R = front * OC2RS;
+            OC2R = front*OC2RS;
         }
         //RLED
         else if (CM2CONbits.CEVT == 1) {
@@ -396,7 +398,7 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
                 PR4 = 14000;
             }
             angle_tur = 180;
-            OC2R = right * OC2RS;
+            OC2R = right*OC2RS;
         }
         //LLED
         else if (CM3CONbits.CEVT == 1) {
@@ -404,7 +406,7 @@ void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
                 PR4 = 14000;
             }
             angle_tur = 0;
-            OC2R = left * OC2RS;
+            OC2R = left*OC2RS;
         }
     }
     CM1CONbits.CEVT = 0; // clear event bits
