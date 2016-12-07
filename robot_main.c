@@ -7,17 +7,17 @@
 #include <stdio.h>
 
 // Speeds (slowest to fastest):
-// const int v1 = 2900;
-// const int v2 = 3300;
-// const int v3 = 4200;
-// const int v4 = 5000;
-// const int v5 = 6000;
+const int v1 = 2900;
+const int v2 = 3300;
+const int v3 = 4200;
+const int v4 = 5000;
+const int v5 = 6000;
 
-const int v1 = 4000;
-const int v2 = 4500;
-const int v3 = 5000;
-const int v4 = 6000;
-const int v5 = 7000;
+// const int v1 = 4000;
+// const int v2 = 4500;
+// const int v3 = 5000;
+// const int v4 = 6000;
+// const int v5 = 7000;
 
 const int vturn = 6000; // rotation during START/ROTATE
 
@@ -25,7 +25,10 @@ const int vturn = 6000; // rotation during START/ROTATE
 const int dist = 5300; // Dispenser to X center
 const int turn = 1900; // ~ 180 deg
 const int to_corner = 10000; // Finding dispenser in the beginning
-const int slow_dist = 5100;
+const int slow_dist = 4900;
+
+const float r_mult = 0.9;
+const int avgtime = 100;
 
 void speedup(void) {
     int a = 200;
@@ -35,37 +38,32 @@ void speedup(void) {
     int e = slow_dist;
 
     if (steps < a) {
-        _CMIE = 0;
         OC1RS = v5;
     }
     else if (steps >= a && steps < b) {
-        _CMIE = 0;
         OC1RS = v4;
     }
     else if (steps >= b && steps < c) {
-        _CMIE = 0;
         OC1RS = v3;
     }
     else if (steps >= c && steps < d) {
-        _CMIE = 0;
         OC1RS = v2;
     }
     else if (steps >= d && steps < e) {
-        _CMIE = 1;
         OC1RS = v1;
     }
 }
 
 void slowdown(void) {
     int a = slow_dist;
-    int b = dist - 100;
+    int b = slow_dist + (dist - slow_dist) / 2;
     int c = dist;
 
     if (steps >= a && steps < b) {
         OC1RS = v2;
     }
     else if (steps >= b && steps < c) {
-        OC1RS = v3;
+        OC1RS = v4;
     }
 }
 
@@ -77,12 +75,8 @@ int main(void) {
     OC_config();
     T1_config();
     T2_config();
-    T3_config();
-    T4_config();
-    T5_config();
     CN_config();
     ad_config();
-    comp_config();
 
     state = START;
     while (1)
@@ -97,7 +91,15 @@ int main(void) {
                 _LATB12 = 1;
                 _LATB13 = 0;
                 OC1RS = vturn;
-                // speedup();
+                if (ADC1BUF4/4095.0 > 0.7 && ADC1BUF13 > 0.7) {
+                    if (steps < 75) {
+                        steps = -30;
+                    }
+                    else {
+                        steps = 0;
+                    }
+                    state = ROTATE;
+                }
                 break;
             case ROTATE:
                 // Rotate opposite direction to face corner
@@ -113,10 +115,9 @@ int main(void) {
                 break;
             case REVERSE:
                 // Drive towards corner until buttons pressed
-                _CMIE = 0;
                 _LATB12 = 0; // steppers
                 _LATB13 = 0;
-                stopped = 0;
+                OC2R = front*OC2RS; // point shooter forwards
                 OC3R = closed*OC3RS; // close release
                 _LATB7 = 0;  // shooting motors off
                 _LATB4 = 1;  // buttons out
@@ -125,7 +126,7 @@ int main(void) {
                 }
                 else if (steps >= (dist+2000) && steps < 10000) {
                     _LATB4 = 0;
-                    TMR3 = 0;
+                    TMR2 = 0;
                     angle_pad = 0;
                     pad_count = 0;
                     state = COLLECT;
@@ -135,7 +136,7 @@ int main(void) {
                 }
                 else if (steps >= (25000)) {
                     _LATB4 = 0;
-                    TMR3 = 0;
+                    TMR2 = 0;
                     angle_pad = 0;
                     pad_count = 0;
                     state = COLLECT;
@@ -152,40 +153,59 @@ int main(void) {
                 // Drive to center, aim for active goal
                 _LATB8 = 1; // connect release
                 _LATB7 = 1; // shooting motors
-                stopped = 0;
-                if (steps < dist) {
+                if (steps < slow_dist) {
                     speedup();
-                    slowdown();
                     _LATB12 = 1;
                     _LATB13 = 1;
                     OC1R = 0.5*OC1RS;
                 }
-                else if (steps >= dist) {
+                else if (steps >= slow_dist) {
+                    leftsum = 0;
+                    frontsum = 0;
+                    rightsum = 0;
                     state = AIM;
-                    _CMIE = 1;
-                    TMR4 = 0; // time needed to aim
-                    OC1R = 0;
-                    stopped = 1;
-                    steps = 0;
                 }
                 break;
             case AIM:
-                // Rotate turret to face active goal (either stopped or driving forward)
-                OC3R = closed*OC3RS; // close release
-                if (steps < dist) {
-                    // keep driving if not yet at center
-                    speedup();
-                    slowdown();
+                // Rotate turret to face active goal
+                slowdown();
+                if (steps > slow_dist && steps < dist && has_aimed == 0) {
+                    // AD: LLED == 0, FLED//FLED2 == 13/4, RLED == 14;
+                    if (steps < slow_dist + avgtime) {
+                        leftsum += ADC1BUF0/4095.0;
+                        frontsum += ADC1BUF13/4095.0;
+                        front2sum += ADC1BUF4/4095.0;
+                        rightsum += ADC1BUF14/4095.0;
+                    }
+                    else if (steps >= slow_dist + avgtime) {
+                        leftavg = leftsum / avgtime;
+                        frontavg = frontsum / avgtime;
+                        front2avg = front2sum / avgtime;
+                        rightavg = (rightsum / avgtime) * r_mult;
+                        if (leftavg > frontavg && leftavg > rightavg) {
+                            OC2R = left*OC2RS;
+                        }
+                        else if (frontavg > rightavg && frontavg > leftavg) {
+                            OC2R = front*OC2RS;
+                        }
+                        else if (rightavg > frontavg && rightavg > front2avg && rightavg > leftavg) {
+                            OC2R = right*OC2RS;
+                        }
+                        else {
+                            OC2R = front*OC2RS;
+                        }
+                        has_aimed = 1;
+                    }
                 }
                 else if (steps >= dist) {
-                    _CMIE = 1;
                     OC1R = 0;
-                    stopped = 1;
+                    TMR1 = 0;
                     steps = 0;
+                    state = SHOOT;
                 }
                 break;
             case SHOOT:
-                _CMIE = 1;
+                steps = 0;
                 OC3R = open*OC3RS;  // open release
                 break;
         }
