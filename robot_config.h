@@ -26,17 +26,15 @@ int has_aimed = 0;   // turret in aiming position
 
     // Turret
     // DUTY btw 0.112 and 0.015
-    // LOWER OR HIGHER WILL SCRATE EF UP
-    const float left = 0.109;
-    const float front = 0.064;
-    const float right = 0.02;
+    // LOWER OR HIGHER WILL SCRATE EFF UP
+    const float left = 0.1097;
+    const float front = 0.0637;
+    const float right = 0.0192;
     // Averaging signal
     float leftsum = 0;
     float leftavg = 0;
     float frontsum = 0;
     float frontavg = 0;
-    float front2sum = 0;
-    float front2avg = 0;
     float rightsum = 0;
     float rightavg = 0;
 
@@ -52,15 +50,12 @@ void T2_config (void);      // Paddle servo back and forth
 void CN_config (void);      // Change Notification Interrupt - buttons
 void ad_config (void);
 void OC_config(void);       // Configure PWM for steppers and servos
-// void comp_config (void);    // Comparator Interrupt - IR sensors
 
 //Interrupt Actions
 void __attribute__((interrupt, no_auto_psv)) _T1Interrupt(void);
 void __attribute__((interrupt, no_auto_psv)) _T2Interrupt (void);
 void __attribute__((interrupt, no_auto_psv)) _CNInterrupt (void);
 void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void);       // stepper counter
-// void __attribute__((interrupt, no_auto_psv)) _CompInterrupt (void);     // IR sensors
-
 
 
 
@@ -192,46 +187,6 @@ void OC_config(void) {
     angle_pad = 0;
 }
 
-// void comp_config (void) {
-//     //configure voltage reference
-//     _CVROE = 0;     // Voltage reference output is internal only
-//     _CVRSS = 0;     // Vdd and Vss as reference voltages
-//     _CVR = 0x1B;    // set Vref at 25/32*(Vdd-Vss) = 2.58 V (0x19 == 25)
-//     _CVREN = 1;     // enable the module
-//
-//     //configure comparators
-//     //FLED
-//     CM1CONbits.CON = 1;         //enable module for configuration
-//     CM1CONbits.COE = 0;         //comparator output is internal only
-//     CM1CONbits.CPOL = 1;        //comparator output is inverted (output high when Vin+ < Vin-)
-//     CM1CONbits.EVPOL = 0b10;    //interrupt on low-high transition
-//     CM1CONbits.CREF = 1;        //Vin+ connected to internal Vref
-//     CM1CONbits.CCH = 0b00;      //Vin- connected to C1INB (pin 7)
-//
-//     //RLED
-//     CM2CONbits.CON = 1;
-//     CM2CONbits.COE = 0;
-//     CM2CONbits.CPOL = 1;
-//     CM2CONbits.EVPOL = 0b10;
-//     CM2CONbits.CREF = 1;
-//     CM2CONbits.CCH = 0b01;      //Vin- connected to C2INC (pin 8)
-//
-//     //LLED
-//     CM3CONbits.CON = 1;
-//     CM3CONbits.COE = 0;
-//     CM3CONbits.CPOL = 1;
-//     CM3CONbits.EVPOL = 0b10;
-//     CM3CONbits.CREF = 1;
-//     CM3CONbits.CCH = 0b01;      //Vin- connected to C3INC (pin 2)
-//
-//     //configure interrupt
-//     CM1CONbits.CEVT = 0; // event bits
-//     CM2CONbits.CEVT = 0;
-//     CM3CONbits.CEVT = 0;
-//     _CMIF = 0;
-//     _CMIE = 1;
-//     _CMIP = 4;
-// }
 
 
 
@@ -294,50 +249,5 @@ void __attribute__((interrupt, no_auto_psv)) _OC1Interrupt(void) {
     steps += 1;
 }
 
-// void __attribute__((interrupt, no_auto_psv)) _CompInterrupt(void) {
-//     _CMIF = 0;
-//
-//     TMR4 = 0;
-//
-//     if (state == START && CM1CONbits.CEVT == 1) {
-//         if (steps < 75) {
-//             steps = -30;
-//         }
-//         else {
-//             while ((ADC1BUF4/4095.0) < 0.6) {};
-//             steps = 0;
-//         }
-//         state = ROTATE;
-//         CM1CONbits.CEVT = 0; // clear event bits
-//         return;
-//     }
-//
-//     if (state == AIM) {
-//         //FLED
-//         if (CM1CONbits.CEVT == 1) {
-//             angle_tur = 90;
-//             OC2R = front*OC2RS;
-//         }
-//         //RLED
-//         else if (CM2CONbits.CEVT == 1) {
-//             if (angle_tur == 0) {
-//                 PR4 = 14000;
-//             }
-//             angle_tur = 180;
-//             OC2R = right*OC2RS;
-//         }
-//         //LLED
-//         else if (CM3CONbits.CEVT == 1) {
-//             if (angle_tur == 180) {
-//                 PR4 = 14000;
-//             }
-//             angle_tur = 0;
-//             OC2R = left*OC2RS;
-//         }
-//     }
-//     CM1CONbits.CEVT = 0; // clear event bits
-//     CM2CONbits.CEVT = 0;
-//     CM3CONbits.CEVT = 0;
-// }
 
 #endif

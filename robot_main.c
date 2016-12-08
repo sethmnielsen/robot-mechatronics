@@ -7,49 +7,47 @@
 #include <stdio.h>
 
 // Speeds (slowest to fastest):
-const int v1 = 2900;
-const int v2 = 3300;
-const int v3 = 4200;
-const int v4 = 5000;
-const int v5 = 6000;
-
-// const int v1 = 4000;
-// const int v2 = 4500;
-// const int v3 = 5000;
-// const int v4 = 6000;
-// const int v5 = 7000;
-
-const int vturn = 6000; // rotation during START/ROTATE
+// const int v1 = 2800;
+const int v1 = 3000;
+const int v2 = 3100;
+const int v3 = 3500;
+const int v4 = 4000;
+const int v5 = 4800;
+const int v6 = 6000;
+const int vturn = 5000; // rotation during START/ROTATE
 
 // Distances
 const int dist = 5300; // Dispenser to X center
-const int turn = 1900; // ~ 180 deg
+const int turn = 1850; // ~ 180 deg
 const int to_corner = 10000; // Finding dispenser in the beginning
-const int slow_dist = 4700;
+const int slow_dist = 4650;
 
-const float r_mult = 1.0;
 const int avgtime = 100;
 
 void speedup(void) {
-    int a = 200;
-    int b = 400;
-    int c = 550;
-    int d = 700;
-    int e = slow_dist;
+    int a = 100;
+    int b = 200;
+    int c = 400;
+    int d = 650;
+    int e = 900;
+    int f = slow_dist;
 
     if (steps < a) {
-        OC1RS = v5;
+        OC1RS = v6;
     }
     else if (steps >= a && steps < b) {
-        OC1RS = v4;
+        OC1RS = v5;
     }
     else if (steps >= b && steps < c) {
-        OC1RS = v3;
+        OC1RS = v4;
     }
     else if (steps >= c && steps < d) {
-        OC1RS = v2;
+        OC1RS = v3;
     }
     else if (steps >= d && steps < e) {
+        OC1RS = v2;
+    }
+    else if (steps >= e && steps < f) {
         OC1RS = v1;
     }
 }
@@ -91,8 +89,11 @@ int main(void) {
                 _LATB12 = 1;
                 _LATB13 = 0;
                 OC1RS = vturn;
-                if (ADC1BUF4/4095.0 > 0.7 && ADC1BUF13/4095.0 > 0.7) {
-                    if (steps < 75) {
+                if (ADC1BUF13/4095.0 > 0.65) {
+                    if (steps < 50) {
+                        break;
+                    }
+                    else if (steps < 75) {
                         steps = -30;
                     }
                     else {
@@ -132,7 +133,7 @@ int main(void) {
                     state = COLLECT;
                 }
                 else if (steps >= 10000 && steps < (25000)) {
-                    OC1RS = v3;
+                    OC1RS = v2;
                 }
                 else if (steps >= (25000)) {
                     _LATB4 = 0;
@@ -179,7 +180,7 @@ int main(void) {
                     else if (steps >= slow_dist + avgtime) {
                         leftavg = leftsum / avgtime;
                         frontavg = frontsum / avgtime;
-                        rightavg = (rightsum / avgtime) * r_mult;
+                        rightavg = rightsum / avgtime;
                         if (leftavg > frontavg && leftavg > rightavg && leftavg > 0.5) {
                             OC2R = left*OC2RS;
                         }
