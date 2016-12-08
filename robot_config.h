@@ -10,7 +10,7 @@
 // Pins 8,9 and 10 are available
 #pragma config OSCIOFNC = OFF
 #pragma config SOSCSRC = DIG
-#pragma config ICS = PGx3
+#pragma config ICS = PGx2
 #pragma config FWDTEN = OFF
 
 
@@ -79,11 +79,15 @@ void pins_config (void) {
 
     //inputs
     _TRISA4 = 1;    // buttons in
+    _TRISA3 = 1;
+    _TRISB2 = 1;
+    _TRISB15 = 1;
+    _TRISA2 = 1;
 
     // AD input
-    _ANSA0 = 1;     // LLED
     _ANSB2 = 1;     // FLED2
     _ANSA2 = 1;     // FLED
+    _ANSB15 = 1;    // LLED
     _ANSA3 = 1;     // RLED
 
     _LATB14 = 1;    // _SLEEP
@@ -137,7 +141,7 @@ void ad_config (void) {
     _NVCFG = 0;
     _BUFREGEN = 1;
     _CSCNA = 1;
-    _SMPI = 2;
+    _SMPI = 3;
     _ALTS = 0;
 
     // AD1CON3 register
@@ -146,10 +150,11 @@ void ad_config (void) {
     _ADCS = 0x3F;
 
     //AD1CSS registers
-    _CSS0 = 1;
     _CSS4 = 1;    //Pin 6 (Photodiode)
+    _CSS9 = 1;
     _CSS13 = 1;
     _CSS14 = 1;
+
     _ADON = 1;    //Turn on A/D
 }
 

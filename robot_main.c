@@ -25,9 +25,9 @@ const int vturn = 6000; // rotation during START/ROTATE
 const int dist = 5300; // Dispenser to X center
 const int turn = 1900; // ~ 180 deg
 const int to_corner = 10000; // Finding dispenser in the beginning
-const int slow_dist = 4900;
+const int slow_dist = 4700;
 
-const float r_mult = 0.9;
+const float r_mult = 1.0;
 const int avgtime = 100;
 
 void speedup(void) {
@@ -91,7 +91,7 @@ int main(void) {
                 _LATB12 = 1;
                 _LATB13 = 0;
                 OC1RS = vturn;
-                if (ADC1BUF4/4095.0 > 0.7 && ADC1BUF13 > 0.7) {
+                if (ADC1BUF4/4095.0 > 0.7 && ADC1BUF13/4095.0 > 0.7) {
                     if (steps < 75) {
                         steps = -30;
                     }
@@ -170,25 +170,23 @@ int main(void) {
                 // Rotate turret to face active goal
                 slowdown();
                 if (steps > slow_dist && steps < dist && has_aimed == 0) {
-                    // AD: LLED == 0, FLED//FLED2 == 13/4, RLED == 14;
+                    // AD: LLED == 9, FLED//FLED2 == 13/4, RLED == 14;
                     if (steps < slow_dist + avgtime) {
-                        leftsum += ADC1BUF0/4095.0;
+                        leftsum += ADC1BUF9/4095.0;
                         frontsum += ADC1BUF13/4095.0;
-                        front2sum += ADC1BUF4/4095.0;
                         rightsum += ADC1BUF14/4095.0;
                     }
                     else if (steps >= slow_dist + avgtime) {
                         leftavg = leftsum / avgtime;
                         frontavg = frontsum / avgtime;
-                        front2avg = front2sum / avgtime;
                         rightavg = (rightsum / avgtime) * r_mult;
-                        if (leftavg > frontavg && leftavg > rightavg) {
+                        if (leftavg > frontavg && leftavg > rightavg && leftavg > 0.5) {
                             OC2R = left*OC2RS;
                         }
-                        else if (frontavg > rightavg && frontavg > leftavg) {
+                        else if (frontavg > rightavg && frontavg > leftavg && frontavg > 0.5) {
                             OC2R = front*OC2RS;
                         }
-                        else if (rightavg > frontavg && rightavg > front2avg && rightavg > leftavg) {
+                        else if (rightavg > frontavg && rightavg > leftavg && rightavg > 0.5) {
                             OC2R = right*OC2RS;
                         }
                         else {
